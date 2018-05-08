@@ -6,7 +6,7 @@ import pickle
 
 class dataset(object):
     def __init__(self,init=False):
-        self.data_dir = "./dataset/zhihudataset/temp2/"
+        self.data_dir = "./dataset/zhihudataset/temp1/"
         self.char_array_dir = self.data_dir + "char_array.pik"
         self.char_model_dir = self.data_dir + "char_model.pik"
         self.label_array_dir = self.data_dir + "label_array.pik"
@@ -99,37 +99,36 @@ class dataset(object):
     #         yield x,y,epoch,num_epochs,i,self.textfilenum,batch_num,num_batches_per_epoch
 
     def train_batch_iter(self, batch_size, num_epochs,load=False,load_batch_num=0):
-        for epoch in range(num_epochs):
-            f = open(self.data_dir + 'question_temp.txt', 'r', errors='ignore')
-            min_num=0
+        # for epoch in range(num_epochs):
+        f = open(self.data_dir + 'question_temp.txt', 'r', errors='ignore')
+        min_num=0
 
-            if load:
-                load=False
-                min_num=load_batch_num+1
-                for i in range(min_num*batch_size):
-                    line=f.readline()
+        if load:
+            load=False
+            min_num=load_batch_num+1
+            for i in range(min_num*batch_size):
+                line=f.readline()
 
-            tempnum=(self.train_num-1)//batch_size+1
-            for k in range(min_num,tempnum):
-                X = []
-                Y = []
-                for j in range(batch_size):
-                    line=f.readline()
-                    if line=='':
-                        break
+        tempnum=(self.train_num-1)//batch_size+1
+        for k in range(min_num,tempnum):
+            X = []
+            Y = []
+            for j in range(batch_size):
+                line=f.readline()
+                if line=='':
+                    break
 
-                    x,y=self.get_information_from_line(line)
-                    X.append(x)
-                    Y.append(y)
-                yield X,Y,epoch,num_epochs,k,tempnum
+                x,y=self.get_information_from_line(line)
+                X.append(x)
+                Y.append(y)
+            yield X,Y,k,tempnum
 
-            f.close()
-
-
+        f.close()
 
     def dev_batch_iter(self,batch_size=64):
         f = open(self.data_dir + 'question_temp_test.txt', 'r', errors='ignore')
         for k in range((self.test_num-1)//batch_size+1):
+        # for k in range(50):
             X = []
             Y = []
             for j in range(batch_size):
@@ -143,9 +142,11 @@ class dataset(object):
             yield X, Y
         f.close()
 
-import datetime
+
 
 def main():
+    import datetime
+
     data=dataset()
 
     starttime = datetime.datetime.now()

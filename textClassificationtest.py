@@ -9,7 +9,8 @@ from collections import Counter
 import pickle
 import random
 
-save_dir='./dataset/zhihudataset/temp2/'
+save_dir='./dataset/zhihudataset/temp1/'
+
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 ###########    读取问题id和topicid的对应关系     ######
@@ -82,7 +83,7 @@ text_size_maxlength=300
 num=0
 max_sentence_size=0
 # train_max=2960000
-train_proportion=0.9
+train_proportion=0.95
 train_num=0
 test_num=0
 
@@ -142,7 +143,8 @@ while line!='':
             temp=temp+' __label__%d' % label_map[int(i)]
         temp+= '\n'
 
-        if random.random()<0.9:
+        # f1.write(temp)
+        if random.random()<train_proportion:
             f1.write(temp)
             train_num+=1
         else:
@@ -157,12 +159,14 @@ while line!='':
     num+=1
     if(num%10000==0):
         print('finish:\t%f%%' % (num/max_example*100))
-    # if num%train_max==0:
+    # if num==int(max_example*train_proportion):
+    #     train_num=num
     #     f1.close()
     #     f1=open(save_dir+'question_temp_test.txt','w')
 f.close()
 f1.close()
 f2.close()
+# test_num=num-train_num
 
 #######         保存所有重要模型参数            ########
 f=open(save_dir+'info.txt', 'w')
