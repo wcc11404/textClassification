@@ -26,15 +26,15 @@ class TextCNN(object):
         self.filter_sizes=[1,2,3,4,5]       #cnn    filter大小,kernel为[filter,embedding_size]
         self.num_filters=128            #cnn    filter数量
         self.l2_reg_lambda = 0.0001     #l2范数的学习率
-        self.decay_steps = 10000
-        self.decay_rate = 0.5  # 62
+        self.decay_steps = 2500
+        self.decay_rate = 0.65
         self.learning_rate = tf.Variable(1e-3, trainable=False, name="learning_rate")  # ADD learning_rate
 
         self.num_checkpoints=100       #存模型的频率
-        self.num_test=2000
+        self.num_test=2500
         self.dropout=0.5               #dropout比例
         # self.learningrate=1e-3          #学习率
-        self.batch_size=64
+        self.batch_size=128
         self.Model_dir = "./TextCNN"  # 模型参数默认保存位置
         self.Saver=tf.train.Saver()
 
@@ -74,7 +74,7 @@ class TextCNN(object):
         # init_value=tf.random_uniform([self.vocab_size, self.embedding_size], -1.0, 1.0)
         with tf.name_scope("embedding"):
             # W = tf.get_variable(initializer=init_value,shape=[self.vocab_size, self.embedding_size],name="Embedding")  #随机产生vocab_size个embedding_size维的字典
-            W = tf.Variable(self.data.load_vocabulary(),trainable=False)
+            W = tf.Variable(self.data.load_vocabulary(),name="embedding_w")
             embedded_chars = tf.nn.embedding_lookup(W, self.input_x)                                        #通过input_x查找对应字典的随机数
 
         embedded_chars_expanded = tf.expand_dims(embedded_chars, -1)#将[none,56,128]后边加一维，变成[none,56,128,1]
@@ -87,7 +87,7 @@ class TextCNN(object):
                 # Convolution Layer1
                 filter_shape = [filter_size, self.embedding_size, 1, self.num_filters]
                 w = tf.Variable(tf.truncated_normal(filter_shape, stddev=0.1), name="w1_%d" % i)
-                b = tf.Variable(tf.constant(0.1, shape=[self.num_filters]), name="b1_%d" % i)
+                b = tf.Variable(tf.constant(0.1, shape=[self.num_filters]), name="bias1_%d" % i)
 
                 conv = tf.nn.conv2d(embedded_chars_expanded, w, strides=[1, 1, 1, 1], padding="VALID")
                 conv = self.batch_norm(conv, self.is_train,name='bn1_%d' % i)
@@ -97,7 +97,7 @@ class TextCNN(object):
                 # Convolution Layer2
                 filter_shape1 = [filter_size, 1, self.num_filters, self.num_filters]
                 w1 = tf.Variable(tf.truncated_normal(filter_shape1, stddev=0.1), name="w2_%d" % i)
-                b1 = tf.Variable(tf.constant(0.1, shape=[self.num_filters]), name="b2_%d" % i)
+                b1 = tf.Variable(tf.constant(0.1, shape=[self.num_filters]), name="bias2_%d" % i)
 
                 conv = tf.nn.conv2d(h, w1, strides=[1, 1, 1, 1], padding="VALID")
                 conv = self.batch_norm(conv, self.is_train,name='bn2_%d' % i)
@@ -117,14 +117,14 @@ class TextCNN(object):
         # with tf.name_scope("dropout"):
         #     h_drop = tf.nn.dropout(h_pool_flat, self.dropout_keep_prob)
         with tf.name_scope("liner"):
-            w1 = tf.Variable(tf.truncated_normal([num_filters_total, 1320],stddev=0.1), name='w1')
-            b1 = tf.Variable(tf.constant(0.1, shape=[1320]), name='b1')
+            w1 = tf.Variable(tf.truncated_normal([num_filters_total, 1320],stddev=0.1), name='weight_line_1')
+            b1 = tf.Variable(tf.constant(0.1, shape=[1320]), name='bias_liner_1')
             liner_out=tf.matmul(h_pool_flat,w1)+b1
-            liner_out=self.batch_norm(liner_out,self.is_train,name='liner_bn1')
+            liner_out=self.batch_norm(liner_out,self.is_train,name='bn_liner_1')
             liner_out=tf.nn.relu(liner_out)
 
-            w2 = tf.Variable(tf.truncated_normal([1320, self.num_classes],stddev=0.1), name='w2')
-            b2 = tf.Variable(tf.constant(0.1, shape=[self.num_classes]), name='b2')
+            w2 = tf.Variable(tf.truncated_normal([1320, self.num_classes],stddev=0.1), name='weight_line_2')
+            b2 = tf.Variable(tf.constant(0.1, shape=[self.num_classes]), name='bias_liner_2')
             liner_out2=tf.matmul(liner_out,w2)+b2
 
         # Final (unnormalized) scores and predictions
@@ -145,9 +145,24 @@ class TextCNN(object):
         learning_rate = tf.train.exponential_decay(self.learning_rate, self.global_step, self.decay_steps,
                                                    self.decay_rate, staircase=True)
         optimizer = tf.train.AdamOptimizer(learning_rate)
-        # optimizer = tf.train.AdamOptimizer(learning_rate)
-        grads_and_vars = optimizer.compute_gradients(self.loss)
+
+        var_expect_embedding=[v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
+        grads_and_vars = optimizer.compute_gradients(self.loss,var_list=var_expect_embedding)
         self.train_op = optimizer.apply_gradients(grads_and_vars, global_step=self.global_step)
+
+        # optimizer1 = tf.train.AdamOptimizer(learning_rate)
+        grads_and_vars1=optimizer.compute_gradients(self.loss)
+        self.train_op1 = optimizer.apply_gradients(grads_and_vars1, global_step=self.global_step)
+
+        # var_expect_embedding = [v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
+        # train_op_array=[]
+        # learning_rate_temp=1e-3
+        # for i in range(10):
+        #     train_op_array.append(tf.train.AdamOptimizer(learning_rate_temp).minimize(self.loss,global_step=self.global_step,var_list=var_expect_embedding))
+        #     learning_rate_temp/=2
+        #
+        # var_embedding=[v for v in tf.trainable_variables() if 'embedding_w' in v.name]
+        # train_embedding_op=tf.train.AdamOptimizer(2e-4).minimize(self.loss,var_list=var_embedding)
 
         self.buildSummaries(grads_and_vars)
 
@@ -168,6 +183,21 @@ class TextCNN(object):
         # 创建记录文件
         #timestamp = str(int(time.time()))
         out_dir = os.path.abspath(os.path.join(os.path.curdir, "runs"))
+        if not os.path.exists(out_dir):
+            os.makedirs(out_dir)
+        list = os.listdir(out_dir)
+        make_dir=False
+        for i in range(0, len(list)):
+            if os.path.exists(out_dir + '\summaries_%d' % i):
+                pass
+            else:
+                out_dir=out_dir + '\summaries_%d' % i
+                os.makedirs(out_dir)
+                make_dir=True
+                break
+        if not make_dir:
+            out_dir = out_dir + '\summaries_%d' % len(list)
+            os.makedirs(out_dir)
         print("Writing to {}\n".format(out_dir))
 
         # Summaries for loss and accuracy
@@ -176,15 +206,18 @@ class TextCNN(object):
 
         # 训练集的记录
         self.train_summary_op = tf.summary.merge([loss_summary])    #归并记录, grad_summaries_merged
-        train_summary_dir = os.path.join(out_dir, "summaries", "train")
+        train_summary_dir = os.path.join(out_dir, "train")
         self.train_summary_writer = tf.summary.FileWriter(train_summary_dir, self.sess.graph)   #类似打开文件操作
 
         # 校验集的记录
         self.dev_summary_op = tf.summary.merge([loss_summary])
-        dev_summary_dir = os.path.join(out_dir, "summaries", "dev")
+        dev_summary_dir = os.path.join(out_dir, "dev")
         self.dev_summary_writer = tf.summary.FileWriter(dev_summary_dir, self.sess.graph)
 
     def trainModel(self,num_epoch=10,last_batch=None):
+        train_op_chioce=self.train_op
+        train_num=0
+        f1_max=0.0
         for epochnum in range(num_epoch):
             if last_batch==None:
                 batches = self.data.train_batch_iter(self.batch_size, num_epoch)  # batch迭代器
@@ -193,48 +226,57 @@ class TextCNN(object):
                     batches = self.data.train_batch_iter(self.batch_size, num_epoch,True,last_batch)  # batch迭代器
                 last_batch=None
 
+            if epochnum>0:
+                train_op_chioce=self.train_op1
+
             for x_batch,y_batch,batchnum,batchmax in batches:                                 #通过迭代器取出batch数据
                 self.sess.graph.finalize()
                 feed_dict = {self.input_x: x_batch, self.input_y: y_batch, self.dropout_keep_prob: self.dropout,self.is_train:True}
-                _, summaries, loss ,step= self.sess.run([self.train_op, self.train_summary_op, self.loss,self.global_step], feed_dict=feed_dict)
+                _, summaries, loss ,step= self.sess.run([train_op_chioce, self.train_summary_op, self.loss,self.global_step], feed_dict=feed_dict)
                 self.train_summary_writer.add_summary(summaries, step)  # 对记录文件添加上边run出的记录和step数
 
-                if(batchnum%self.num_checkpoints==0):
+                if ((step - 1) % self.num_checkpoints == 0):
                     print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                     print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, num_epoch, batchnum, batchmax))
-                    self.saveModel(batchnum)
-                    # print(self.sess.run(self.moving_mean)[0])
 
-                if(batchnum and batchnum%self.num_test==0):
-                    self.testModel()
+                if ((step - 1) and (step - 1) % self.num_test == 0):
+                    f1=self.testModel()
+                    if f1>f1_max:
+                        f1_max=f1
+                        self.saveModel(batchnum)
 
             print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            print('epoch finish')
-            self.saveModel(-1)
+            print('epoch %d finish' % epochnum+1)
+
+            # f1 = self.testModel()
+            # if f1 > f1_max:
+            #     f1_max = f1
+            #     self.saveModel(-1)
+            # else:
+            #     self.loadModel()
+            #     train_num+=1
 
     def testModel(self):
         dev_iter = self.data.dev_batch_iter()
-        # print(self.sess.run(self.moving_mean)[0])
         eval_counter, eval_p, eval_r_fenzi,eval_r_fenmu = 0, 0.0, 0.0, 0.0
         for x,y in dev_iter:
             feed_dict = {self.input_x: x, self.input_y: y, self.dropout_keep_prob: 1.0,self.is_train:False}
             summaries, loss, out ,step= self.sess.run([self.dev_summary_op, self.loss, self.out,self.global_step],feed_dict=feed_dict)
 
-            # temp = np.around(out)
-            # f1 = precision_recall_fscore_support(y_dev, temp, average='micro')
             for i in range(len(out)):
                 label_list_top5 = self.get_label_using_logits(out[i])
                 eval_y_short = self.get_target_label_short(y[i])
                 p, r_fenzi,r_fenmu = self.compute_p_r(list(label_list_top5), eval_y_short)
                 eval_counter, eval_p, eval_r_fenzi, eval_r_fenmu= eval_counter + 1, eval_p + p, eval_r_fenzi + r_fenzi, eval_r_fenmu+r_fenmu
 
-        # self.dev_summary_writer.add_summary(summaries, step)
         p_5 = eval_p / eval_counter
         r_5 = eval_r_fenzi / eval_r_fenmu
         f1 = p_5 * r_5 / (p_5 + r_5 + 0.000001)
-        # print(f1)
+
         print("Evaluation: step {}, loss {:g}, precision {:g}, recall {:g}, f1 {:g}".format(step, loss, p_5, r_5, f1))
         print("")
+
+        return f1
 
     def Looptrain(self):
             num=self.loadModel()
