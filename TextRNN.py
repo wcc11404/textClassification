@@ -237,7 +237,7 @@ class TextRNN(object):
 
         print("Evaluation: step {}, loss {:g}, precision {:g}, recall {:g}, f1 {:g}".format(step, loss, p_5, r_5, f1))
 
-        return f1
+        return f1 
 
     def Looptrain(self):
             num=self.loadModel()
