@@ -140,35 +140,35 @@ class TextCNN(object):
 
         # Define Training procedure
         self.global_step = tf.Variable(0, name="global_step", trainable=False)
-        learning_rate = tf.train.exponential_decay(self.learning_rate, self.global_step, self.decay_steps,
-                                                   self.decay_rate, staircase=True)
-        optimizer = tf.train.AdamOptimizer(learning_rate)
-
-        var_expect_embedding=[v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
-        grads_and_vars = optimizer.compute_gradients(self.loss,var_list=var_expect_embedding)
-        self.train_op = optimizer.apply_gradients(grads_and_vars, global_step=self.global_step)
-
-        # optimizer1 = tf.train.AdamOptimizer(learning_rate)
-        grads_and_vars1=optimizer.compute_gradients(self.loss)
-        self.train_op1 = optimizer.apply_gradients(grads_and_vars1, global_step=self.global_step)
-
-        # var_expect_embedding = [v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
-        # train_op_array=[]
-        # learning_rate_temp=1e-3
-        # for i in range(10):
-        #     train_op_array.append(tf.train.AdamOptimizer(learning_rate_temp).minimize(self.loss,global_step=self.global_step,var_list=var_expect_embedding))
-        #     learning_rate_temp/=2
+        # learning_rate = tf.train.exponential_decay(self.learning_rate, self.global_step, self.decay_steps,
+        #                                            self.decay_rate, staircase=True)
+        # optimizer = tf.train.AdamOptimizer(learning_rate)
         #
-        # var_embedding=[v for v in tf.trainable_variables() if 'embedding_w' in v.name]
-        # train_embedding_op=tf.train.AdamOptimizer(2e-4).minimize(self.loss,var_list=var_embedding)
+        # var_expect_embedding=[v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
+        # grads_and_vars = optimizer.compute_gradients(self.loss,var_list=var_expect_embedding)
+        # self.train_op = optimizer.apply_gradients(grads_and_vars, global_step=self.global_step)
+        #
+        # # optimizer1 = tf.train.AdamOptimizer(learning_rate)
+        # grads_and_vars1=optimizer.compute_gradients(self.loss)
+        # self.train_op1 = optimizer.apply_gradients(grads_and_vars1, global_step=self.global_step)
 
-        self.buildSummaries(grads_and_vars)
+        var_expect_embedding = [v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
+        self.train_op_array=[]
+        learning_rate_temp=4e-4
+        for i in range(10):
+            self.train_op_array.append(tf.train.AdamOptimizer(learning_rate_temp).minimize(self.loss,global_step=self.global_step,var_list=var_expect_embedding))
+            learning_rate_temp/=2.0
+
+        var_embedding=[v for v in tf.trainable_variables() if 'embedding_w' in v.name]
+        self.train_embedding_op=tf.train.AdamOptimizer(2e-4).minimize(self.loss,var_list=var_embedding)
+
+        self.buildSummaries()
 
         # 初始化变量
         self.sess.run(tf.initialize_all_variables())
         self.Saver = tf.train.Saver()
 
-    def buildSummaries(self,grads_and_vars):
+    def buildSummaries(self,grads_and_vars=None):
         # Keep track of gradient values and sparsity (optional)
         # grad_summaries = []
         # for g, v in grads_and_vars:
@@ -251,13 +251,56 @@ class TextCNN(object):
             print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             print('epoch %d finish' % (epochnum+1))
 
-            # f1 = self.testModel()
-            # if f1 > f1_max:
-            #     f1_max = f1
-            #     self.saveModel(-1)
-            # else:
-            #     self.loadModel()
-            #     train_num+=1
+    def trainModel1(self):
+        def trainModel(self, num_epoch=10, last_batch=None):
+            train_num = 0
+            train_op_chioce = self.train_op_array[train_num]
+            f1_max = 0.0
+
+            print("start training")
+
+            for epochnum in range(num_epoch):
+                # if last_batch == None:
+                #     batches = self.data.train_batch_iter(self.batch_size, num_epoch)  # batch迭代器
+                # else:
+                #     if last_batch != -1:
+                #         batches = self.data.train_batch_iter(self.batch_size, num_epoch, True, last_batch)  # batch迭代器
+                #     last_batch = None
+                batches = self.data.train_batch_iter(self.batch_size, num_epoch)  # batch迭代器
+
+                if train_num < 10:
+                    train_op_chioce = self.train_op_array[train_num]
+                else:
+                    break
+
+                for x_batch, y_batch, batchnum, batchmax in batches:  # 通过迭代器取出batch数据
+                    self.sess.graph.finalize()
+
+                    feed_dict = {self.input_x: x_batch, self.input_y: y_batch, self.dropout_keep_prob: self.dropout,
+                                 self.is_train: True}
+                    if epochnum>=1:
+                        _, summaries, loss, step = self.sess.run(
+                            [train_op_chioce, self.train_summary_op, self.loss, self.global_step], feed_dict=feed_dict)
+                    else:
+                        _,_, summaries, loss, step = self.sess.run(
+                            [self.train_embedding_op,train_op_chioce, self.train_summary_op, self.loss, self.global_step], feed_dict=feed_dict)
+                    self.train_summary_writer.add_summary(summaries, step)  # 对记录文件添加上边run出的记录和step数
+
+                    if (batchnum % self.num_checkpoints == 0):
+                        print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                        print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, num_epoch, batchnum, batchmax))
+
+                f1 = self.testModel()
+                if f1 > f1_max:
+                    f1_max = f1
+                    self.saveModel(-1)
+                    print("saved")
+                else:
+                    self.loadModel()
+                train_num += 1
+
+                print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                print('epoch %d finish' % (epochnum + 1))
 
     def testModel(self):
         self.data.init_evalution()

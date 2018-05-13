@@ -1,10 +1,4 @@
-import textCNN
-import sentiment_dataset
-import numpy as np
-import tensorflow as tf
-import codecs
 import os
-import pickle
 from collections import Counter
 import pickle
 import random
