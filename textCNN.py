@@ -3,7 +3,6 @@ import os
 import time
 import datetime
 import numpy as np
-from sklearn.metrics import precision_recall_fscore_support
 # from zhihu_sample_dataset import dataset
 from zhihu_dataset import dataset
 import math
