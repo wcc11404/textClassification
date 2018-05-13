@@ -2,10 +2,10 @@ import numpy as np
 import os
 from collections import Counter
 import pickle
-
+import math
 
 class dataset(object):
-    def __init__(self,init=False):
+    def __init__(self,mode=1):
         self.data_dir = "./dataset/zhihudataset/temp1/"
         self.char_array_dir = self.data_dir + "char_array.pik"
         self.char_model_dir = self.data_dir + "char_model.pik"
@@ -25,6 +25,12 @@ class dataset(object):
             self.max_sentence_size=int(line[0])
             self.train_num=int(line[1])
             self.test_num=int(line[2])
+
+        self.mode=mode
+        if self.mode==2:
+            self.dev_x,self.dev_y=self.get_dev_dataset()
+
+        self.init_evalution()
 
     def get_param(self):
         #return 最长句子长度，输出维数，输入字典维数,输入字典内容维数(embedding_size)
@@ -126,41 +132,107 @@ class dataset(object):
         f.close()
 
     def dev_batch_iter(self,batch_size=64):
-        f = open(self.data_dir + 'question_temp_test.txt', 'r', errors='ignore')
-        for k in range((self.test_num-1)//batch_size+1):
-        # for k in range(50):
-            X = []
-            Y = []
-            for j in range(batch_size):
-                line = f.readline()
-                if line == '':
-                    break
+        if self.mode==1:
+            f = open(self.data_dir + 'question_temp_test.txt', 'r', errors='ignore')
+            for k in range((self.test_num-1)//batch_size+1):
+            # for k in range(50):
+                X = []
+                Y = []
+                for j in range(batch_size):
+                    line = f.readline()
+                    if line == '':
+                        break
 
-                x, y = self.get_information_from_line(line)
-                X.append(x)
-                Y.append(y)
-            yield X, Y
+                    x, y = self.get_information_from_line(line)
+                    X.append(x)
+                    Y.append(y)
+                yield X, Y
+            f.close()
+        elif self.mode==2:
+            for k in range((self.test_num - 1) // batch_size + 1):
+                max_num = min((k + 1) * batch_size, self.test_num)
+                min_num = k * batch_size
+                yield self.dev_x[min_num:max_num], self.dev_y[min_num:max_num]
+
+    def get_dev_dataset(self):
+        f = open(self.data_dir + 'question_temp_test.txt', 'r', errors='ignore')
+        X = []
+        Y = []
+
+        for line in f.readlines():
+            x, y = self.get_information_from_line(line)
+            X.append(x)
+            Y.append(y)
+
         f.close()
 
+        return X,Y
 
+    def init_evalution(self):
+        self.p_5 = 0.0
+        self.p_counter = 0.0
+        self.r_fenzi = 0.0
+        self.r_fenmu = 0.0
+        self.f1 = 0.0
+
+    def get_evalution_result(self):
+        p_5 = self.p_5 / self.p_counter
+        r_5 = self.r_fenzi / self.r_fenmu
+        f1 = p_5 * r_5 / (p_5 + r_5 + 0.000001)
+
+        return p_5,r_5,f1
+
+    def evalution(self,logits, label):
+        label_list_top5 = self.get_label_using_logits(logits)
+        eval_y_short = self.get_target_label_short(label)
+        num_correct_label = 0
+        p_5=0.0
+
+        for i,label_predict in enumerate(label_list_top5):
+            if label_predict in eval_y_short:
+                num_correct_label += 1
+                p_5 = p_5 + 1.0/math.log(2+i)
+
+        all_real_labels = len(eval_y_short)
+
+        self.p_5 += p_5
+        self.p_counter += 1
+        self.r_fenzi += num_correct_label
+        self.r_fenmu += all_real_labels
+
+        return p_5,num_correct_label,all_real_labels
+
+    def get_target_label_short(self,eval_y):
+        eval_y_short = []  # will be like:[22,642,1391]
+        for index, label in enumerate(eval_y):
+            if label > 0:
+                eval_y_short.append(index)
+        return eval_y_short
+
+    # get top5 predicted labels
+    def get_label_using_logits(self,logits, top_number=5):
+        index_list = np.argsort(logits)[-top_number:]
+        index_list = index_list[::-1]
+        return index_list
 
 def main():
     import datetime
 
-    data=dataset()
-
     starttime = datetime.datetime.now()
 
+    data=dataset(2)
+
     i=0
-    iter=data.train_batch_iter(64,1)
-    for x,y,_,_,_,_ in iter:
+    iter=data.dev_batch_iter2()
+    for x,y in iter:
         i+=1
 
-        if(i%1000==0):
-            print(i)
+        # if(i%1000==0):
+        #     print(i)
 
     endtime = datetime.datetime.now()
-    print(endtime - starttime).seconds
+
+    print((endtime - starttime).seconds)
 
 if __name__ == '__main__':
   main()

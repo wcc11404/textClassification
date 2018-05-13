@@ -3,7 +3,6 @@ import os
 import time
 import datetime
 import numpy as np
-from sklearn.metrics import precision_recall_fscore_support
 # from zhihu_sample_dataset import dataset
 from zhihu_dataset import dataset
 import math
@@ -35,8 +34,7 @@ class TextCNN(object):
         self.dropout=0.5               #dropout比例
         # self.learningrate=1e-3          #学习率
         self.batch_size=128
-        self.Model_dir = "./TextCNN"  # 模型参数默认保存位置
-        self.Saver=tf.train.Saver()
+        self.Model_dir = "TextCNN"  # 模型参数默认保存位置
 
         self.is_train= tf.placeholder(tf.bool)
 
@@ -168,6 +166,7 @@ class TextCNN(object):
 
         # 初始化变量
         self.sess.run(tf.initialize_all_variables())
+        self.Saver = tf.train.Saver()
 
     def buildSummaries(self,grads_and_vars):
         # Keep track of gradient values and sparsity (optional)
@@ -218,6 +217,9 @@ class TextCNN(object):
         train_op_chioce=self.train_op
         train_num=0
         f1_max=0.0
+
+        print("start training")
+
         for epochnum in range(num_epoch):
             if last_batch==None:
                 batches = self.data.train_batch_iter(self.batch_size, num_epoch)  # batch迭代器
@@ -244,9 +246,10 @@ class TextCNN(object):
                     if f1>f1_max:
                         f1_max=f1
                         self.saveModel(batchnum)
+                        print("saved")
 
             print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            print('epoch %d finish' % epochnum+1)
+            print('epoch %d finish' % (epochnum+1))
 
             # f1 = self.testModel()
             # if f1 > f1_max:
@@ -257,24 +260,19 @@ class TextCNN(object):
             #     train_num+=1
 
     def testModel(self):
+        self.data.init_evalution()
         dev_iter = self.data.dev_batch_iter()
-        eval_counter, eval_p, eval_r_fenzi,eval_r_fenmu = 0, 0.0, 0.0, 0.0
+
         for x,y in dev_iter:
             feed_dict = {self.input_x: x, self.input_y: y, self.dropout_keep_prob: 1.0,self.is_train:False}
             summaries, loss, out ,step= self.sess.run([self.dev_summary_op, self.loss, self.out,self.global_step],feed_dict=feed_dict)
 
             for i in range(len(out)):
-                label_list_top5 = self.get_label_using_logits(out[i])
-                eval_y_short = self.get_target_label_short(y[i])
-                p, r_fenzi,r_fenmu = self.compute_p_r(list(label_list_top5), eval_y_short)
-                eval_counter, eval_p, eval_r_fenzi, eval_r_fenmu= eval_counter + 1, eval_p + p, eval_r_fenzi + r_fenzi, eval_r_fenmu+r_fenmu
+                self.data.evalution(out[i],y[i])
 
-        p_5 = eval_p / eval_counter
-        r_5 = eval_r_fenzi / eval_r_fenmu
-        f1 = p_5 * r_5 / (p_5 + r_5 + 0.000001)
+        p_5, r_5, f1 = self.data.get_evalution_result()
 
         print("Evaluation: step {}, loss {:g}, precision {:g}, recall {:g}, f1 {:g}".format(step, loss, p_5, r_5, f1))
-        print("")
 
         return f1
 
@@ -289,44 +287,18 @@ class TextCNN(object):
         if not os.path.exists(dir):
             os.makedirs(dir)
         self.Saver.save(self.sess, dir + "/model.ckpt")
-        f=open(dir+'/info.txt','w')
+        f=open("./"+dir+'/info.txt','w')
         f.write('%d\n' % batchnum)
         f.close()
 
     def loadModel(self,dir=None):
         if (dir == None):
             dir = self.Model_dir
-        self.Saver.restore(self.sess, dir+"/model.ckpt")
-        f = open(dir + '/info.txt', 'r')
+        self.Saver.restore(self.sess, "./"+dir+"/model.ckpt")
+        f = open("./"+dir + '/info.txt', 'r')
         line=f.readline()
         f.close()
         return int(line)
-
-    def compute_p_r(self,label_list_top5, eval_y_short):
-        num_correct_label = 0
-        p_5=0.0
-        for i,label_predict in enumerate(label_list_top5):
-            if label_predict in eval_y_short:
-                num_correct_label += 1
-                p_5 = p_5 + 1.0/math.log(2+i)
-
-
-        all_real_labels = len(eval_y_short)
-
-        return p_5,num_correct_label,all_real_labels
-
-    def get_target_label_short(self,eval_y):
-        eval_y_short = []  # will be like:[22,642,1391]
-        for index, label in enumerate(eval_y):
-            if label > 0:
-                eval_y_short.append(index)
-        return eval_y_short
-
-    # get top5 predicted labels
-    def get_label_using_logits(self,logits, top_number=5):
-        index_list = np.argsort(logits)[-top_number:]
-        index_list = index_list[::-1]
-        return index_list
 
 def main():
     cnn=TextCNN()
