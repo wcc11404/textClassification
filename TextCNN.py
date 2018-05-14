@@ -128,28 +128,29 @@ class TextCNN(object):
         # Define Training procedure
         self.global_step = tf.Variable(0, name="global_step", trainable=False)
         ##########################################  简版训练op  #################################################
-        learning_rate = tf.train.exponential_decay(self.learning_rate, self.global_step, self.decay_steps,
-                                                   self.decay_rate, staircase=True)
-        optimizer = tf.train.AdamOptimizer(learning_rate)
+        if self.mode==1:
+            learning_rate = tf.train.exponential_decay(self.learning_rate, self.global_step, self.decay_steps,
+                                                       self.decay_rate, staircase=True)
+            optimizer = tf.train.AdamOptimizer(learning_rate)
 
-        var_expect_embedding=[v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
-        grads_and_vars = optimizer.compute_gradients(self.loss,var_list=var_expect_embedding)
-        self.train_op = optimizer.apply_gradients(grads_and_vars, global_step=self.global_step)
+            var_expect_embedding=[v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
+            grads_and_vars = optimizer.compute_gradients(self.loss,var_list=var_expect_embedding)
+            self.train_op = optimizer.apply_gradients(grads_and_vars, global_step=self.global_step)
 
-        # optimizer1 = tf.train.AdamOptimizer(learning_rate)
-        grads_and_vars1=optimizer.compute_gradients(self.loss)
-        self.train_op1 = optimizer.apply_gradients(grads_and_vars1, global_step=self.global_step)
+            # optimizer1 = tf.train.AdamOptimizer(learning_rate)
+            grads_and_vars1=optimizer.compute_gradients(self.loss)
+            self.train_op1 = optimizer.apply_gradients(grads_and_vars1, global_step=self.global_step)
         ##########################################################################################################
+        elif self.mode==2:
+            var_expect_embedding = [v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
+            self.train_op_array=[]
+            learning_rate_temp=1e-3
+            for i in range(10):
+                self.train_op_array.append(tf.train.AdamOptimizer(learning_rate_temp).minimize(self.loss,global_step=self.global_step,var_list=var_expect_embedding))
+                learning_rate_temp/=2.0
 
-        var_expect_embedding = [v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
-        self.train_op_array=[]
-        learning_rate_temp=1e-3
-        for i in range(10):
-            self.train_op_array.append(tf.train.AdamOptimizer(learning_rate_temp).minimize(self.loss,global_step=self.global_step,var_list=var_expect_embedding))
-            learning_rate_temp/=2.0
-
-        var_embedding=[v for v in tf.trainable_variables() if 'embedding_w' in v.name]
-        self.train_embedding_op=tf.train.AdamOptimizer(2e-4).minimize(self.loss,var_list=var_embedding)
+            var_embedding=[v for v in tf.trainable_variables() if 'embedding_w' in v.name]
+            self.train_embedding_op=tf.train.AdamOptimizer(2e-4).minimize(self.loss,var_list=var_embedding)
 
         self.buildSummaries()
 
