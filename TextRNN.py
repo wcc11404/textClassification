@@ -95,14 +95,23 @@ class TextRNN(object):
         ##########################################################################################################
         elif self.mode==2:
             var_expect_embedding = [v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
-            self.train_op_array=[]
-            learning_rate_temp=1e-3
+            train_adamop_array = []
+            learning_rate_temp = 1e-3
             for i in range(10):
-                self.train_op_array.append(tf.train.AdamOptimizer(learning_rate_temp).minimize(self.loss,global_step=self.global_step,var_list=var_expect_embedding))
-                learning_rate_temp/=2.0
+                train_adamop_array.append(tf.train.AdamOptimizer(
+                    learning_rate_temp))  # .minimize(self.loss,global_step=self.global_step,var_list=var_expect_embedding))
+                learning_rate_temp /= 2.0
+            var_embedding = [v for v in tf.trainable_variables() if 'embedding_w' in v.name]
+            train_embedding_adamop = tf.train.AdamOptimizer(2e-4)  # .minimize(self.loss,var_list=var_embedding)
 
-            var_embedding=[v for v in tf.trainable_variables() if 'embedding_w' in v.name]
-            self.train_embedding_op=tf.train.AdamOptimizer(2e-4).minimize(self.loss,var_list=var_embedding)
+            grads = tf.gradients(self.loss, var_expect_embedding + var_embedding)
+            grads1 = grads[:len(var_expect_embedding)]
+            grads2 = grads[len(var_expect_embedding):]
+
+            self.train_op_array = []
+            for i in range(10):
+                self.train_op_array.append(train_adamop_array[i].apply_gradients(zip(grads1, var_expect_embedding)))
+            self.train_embedding_op = train_embedding_adamop.apply_gradients(zip(grads2, var_embedding))
 
         self.buildSummaries()
 
