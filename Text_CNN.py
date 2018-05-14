@@ -251,56 +251,55 @@ class TextCNN(object):
             print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             print('epoch %d finish' % (epochnum+1))
 
-    def trainModel1(self):
-        def trainModel(self, num_epoch=10, last_batch=None):
-            train_num = 0
-            train_op_chioce = self.train_op_array[train_num]
-            f1_max = 0.0
+    def trainModel1(self,num_epoch=10):
+        train_num = 0
+        train_op_chioce = self.train_op_array[train_num]
+        f1_max = 0.0
 
-            print("start training")
+        print("start training")
 
-            for epochnum in range(num_epoch):
-                # if last_batch == None:
-                #     batches = self.data.train_batch_iter(self.batch_size, num_epoch)  # batch迭代器
-                # else:
-                #     if last_batch != -1:
-                #         batches = self.data.train_batch_iter(self.batch_size, num_epoch, True, last_batch)  # batch迭代器
-                #     last_batch = None
-                batches = self.data.train_batch_iter(self.batch_size, num_epoch)  # batch迭代器
+        for epochnum in range(num_epoch):
+            # if last_batch == None:
+            #     batches = self.data.train_batch_iter(self.batch_size, num_epoch)  # batch迭代器
+            # else:
+            #     if last_batch != -1:
+            #         batches = self.data.train_batch_iter(self.batch_size, num_epoch, True, last_batch)  # batch迭代器
+            #     last_batch = None
+            batches = self.data.train_batch_iter(self.batch_size, num_epoch)  # batch迭代器
 
-                if train_num < 10:
-                    train_op_chioce = self.train_op_array[train_num]
+            if train_num < 10:
+                train_op_chioce = self.train_op_array[train_num]
+            else:
+                break
+
+            for x_batch, y_batch, batchnum, batchmax in batches:  # 通过迭代器取出batch数据
+                self.sess.graph.finalize()
+
+                feed_dict = {self.input_x: x_batch, self.input_y: y_batch, self.dropout_keep_prob: self.dropout,
+                             self.is_train: True}
+                if epochnum>=1:
+                    _, summaries, loss, step = self.sess.run(
+                        [train_op_chioce, self.train_summary_op, self.loss, self.global_step], feed_dict=feed_dict)
                 else:
-                    break
+                    _,_, summaries, loss, step = self.sess.run(
+                        [self.train_embedding_op,train_op_chioce, self.train_summary_op, self.loss, self.global_step], feed_dict=feed_dict)
+                self.train_summary_writer.add_summary(summaries, step)  # 对记录文件添加上边run出的记录和step数
 
-                for x_batch, y_batch, batchnum, batchmax in batches:  # 通过迭代器取出batch数据
-                    self.sess.graph.finalize()
+                if (batchnum % self.num_checkpoints == 0):
+                    print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                    print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, num_epoch, batchnum, batchmax))
 
-                    feed_dict = {self.input_x: x_batch, self.input_y: y_batch, self.dropout_keep_prob: self.dropout,
-                                 self.is_train: True}
-                    if epochnum>=1:
-                        _, summaries, loss, step = self.sess.run(
-                            [train_op_chioce, self.train_summary_op, self.loss, self.global_step], feed_dict=feed_dict)
-                    else:
-                        _,_, summaries, loss, step = self.sess.run(
-                            [self.train_embedding_op,train_op_chioce, self.train_summary_op, self.loss, self.global_step], feed_dict=feed_dict)
-                    self.train_summary_writer.add_summary(summaries, step)  # 对记录文件添加上边run出的记录和step数
+            f1 = self.testModel()
+            if f1 > f1_max:
+                f1_max = f1
+                self.saveModel(-1)
+                print("saved")
+            else:
+                self.loadModel()
+            train_num += 1
 
-                    if (batchnum % self.num_checkpoints == 0):
-                        print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-                        print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, num_epoch, batchnum, batchmax))
-
-                f1 = self.testModel()
-                if f1 > f1_max:
-                    f1_max = f1
-                    self.saveModel(-1)
-                    print("saved")
-                else:
-                    self.loadModel()
-                train_num += 1
-
-                print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-                print('epoch %d finish' % (epochnum + 1))
+            print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            print('epoch %d finish' % (epochnum + 1))
 
     def testModel(self):
         self.data.init_evalution()
@@ -346,7 +345,7 @@ class TextCNN(object):
 def main():
     cnn=TextCNN()
     # cnn.Looptrain()
-    cnn.trainModel()
+    cnn.trainModel1()
     # cnn.loadModel()
     # cnn.testModel()
 

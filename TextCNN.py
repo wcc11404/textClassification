@@ -5,28 +5,52 @@ from zhihu_dataset import dataset
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
-class TextRNN(object):
-    def __init__(self,mode=1):
+class TextCNN(object):
+    def __init__(self, mode=1):
         self.sess = tf.InteractiveSession()
         self.mode=mode
         self.data=dataset(self.mode)             #数据集
 
         self.sequence_length,self.num_classes,self.vocab_size,self.embedding_size=self.data.get_param()
 
-        self.hidden_size=self.embedding_size
-        self.is_train = tf.placeholder(tf.bool) #batchnormalization用
-
-        self.decay_steps = 3000
-        self.decay_rate = 0.5  # 62
+        self.filter_sizes=[1,2,3,4,5]       #cnn    filter大小,kernel为[filter,embedding_size]
+        self.num_filters=128            #cnn    filter数量
         self.l2_reg_lambda = 0.0001     #l2范数的学习率
+        self.decay_steps = 2500
+        self.decay_rate = 0.65
+        self.learning_rate = tf.Variable(1e-3, trainable=False, name="learning_rate")  # ADD learning_rate
+
         self.num_checkpoints=100       #存模型的频率
-        self.num_test=1000
-        self.dropout=1.0               #dropout比例
-        self.learning_rate = tf.Variable(1e-2, trainable=False, name="learning_rate")  # ADD learning_rate
-        self.batch_size=64
-        self.Model_dir = "./TextRNN"  # 模型参数默认保存位置
+        self.num_test=2500
+        self.dropout=0.5               #dropout比例
+        self.batch_size=128
+        self.Model_dir = "TextCNN"  # 模型参数默认保存位置
+
+        self.is_train= tf.placeholder(tf.bool)
 
         self.buildModel()
+
+    def batch_norm(self,x, train, eps=1e-05, decay=0.9, affine=True, name=None):
+        from tensorflow.python.training.moving_averages import assign_moving_average
+        with tf.variable_scope(name, default_name='BatchNorm2d'):
+            params_shape = x.shape[-1:]
+            moving_mean = tf.get_variable('mean', params_shape, initializer=tf.zeros_initializer,trainable=False)  # moving两个变量永久保存，供测试时候使用
+            moving_variance = tf.get_variable('variance', params_shape, initializer=tf.ones_initializer,trainable=False)
+
+            def mean_var_with_update():
+                mean, variance = tf.nn.moments(x, [i for i in range(len(x.shape)-1)], name='moments')  # 求当前batch的平均值和标准差
+                # control_dependencies通常与with一起用，当with代码块中语句为tensorflow op操作时，确保先执行con里边的语句，如果不是op操作，只是单纯的tensor取值，则不执行
+                with tf.control_dependencies([assign_moving_average(moving_mean, mean, decay),assign_moving_average(moving_variance, variance,decay)]):  # 求滑动平均值，赋值给moving两个变量
+                    return tf.identity(mean), tf.identity(variance)  # 将当前batch的平均值和标准差返回，当需要y=x这种赋值操作时，使用y=tf.identity(x)
+
+            mean, variance = tf.cond(train, mean_var_with_update,lambda: (moving_mean, moving_variance))  # if else ，train为真时，返回第二个参数，假时返回第三个参数
+            if affine:
+                beta = tf.get_variable('beta', params_shape, initializer=tf.zeros_initializer)  #
+                gamma = tf.get_variable('gamma', params_shape, initializer=tf.ones_initializer)
+                x = tf.nn.batch_normalization(x, mean, variance, beta, gamma, eps)
+            else:
+                x = tf.nn.batch_normalization(x, mean, variance, None, None, eps)
+            return x
 
     def buildModel(self):
         self.input_x = tf.placeholder(tf.int32, [None, self.sequence_length], name="input_x")
@@ -34,45 +58,69 @@ class TextRNN(object):
         self.dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
 
         # Embedding layer
-        init_value=tf.truncated_normal_initializer(stddev=0.1)
+        init_value=tf.random_normal_initializer(stddev=0.1)
         with tf.name_scope("embedding"):
             W = tf.Variable(self.data.load_vocabulary(),name="embedding_w")
             embedded_chars = tf.nn.embedding_lookup(W, self.input_x)                                        #通过input_x查找对应字典的随机数
 
-        with tf.name_scope("RNN"):
-            lstm_fw_cell = tf.contrib.rnn.BasicLSTMCell(self.hidden_size)  # forward direction cell
-            lstm_bw_cell = tf.contrib.rnn.BasicLSTMCell(self.hidden_size)  # backward direction cell
-            # if self.dropout_keep_prob is not None:
-            #     lstm_fw_cell = tf.contrib.rnn.DropoutWrapper(lstm_fw_cell, output_keep_prob=self.dropout_keep_prob)
-            #     lstm_bw_cell = tf.contrib.rnn.DropoutWrapper(lstm_bw_cell, output_keep_prob=self.dropout_keep_prob)
+        embedded_chars_expanded = tf.expand_dims(embedded_chars, -1)#将[none,56,128]后边加一维，变成[none,56,128,1]
 
-            outputs,_=tf.nn.bidirectional_dynamic_rnn(lstm_fw_cell,lstm_bw_cell,embedded_chars,dtype=tf.float32,scope="LSTM_1") #[batch_size,sequence_length,hidden_size] #creates a dynamic bidirectional recurrent neural network
-            output_rnn = tf.concat(outputs, axis=2)  # [batch_size,sequence_length,hidden_size*2]
+        # Create a convolution + maxpool layer for each filter size
+        pooled_outputs = []
+        for i, filter_size in enumerate(self.filter_sizes):
+            with tf.name_scope("conv-maxpool-%s" % filter_size):
 
+                # Convolution Layer1
+                filter_shape = [filter_size, self.embedding_size, 1, self.num_filters]
+                w = tf.Variable(tf.truncated_normal(filter_shape, stddev=0.1), name="w1_%d" % i)
+                b = tf.Variable(tf.constant(0.1, shape=[self.num_filters]), name="bias1_%d" % i)
 
-            lstm_fw_cell = tf.contrib.rnn.BasicLSTMCell(self.hidden_size*2)  # forward direction cell
-            lstm_bw_cell = tf.contrib.rnn.BasicLSTMCell(self.hidden_size*2)  # backward direction cell
-            # if self.dropout_keep_prob is not None:
-            #     lstm_fw_cell = tf.contrib.rnn.DropoutWrapper(lstm_fw_cell, output_keep_prob=self.dropout_keep_prob)
-            #     lstm_bw_cell = tf.contrib.rnn.DropoutWrapper(lstm_bw_cell, output_keep_prob=self.dropout_keep_prob)
+                conv = tf.nn.conv2d(embedded_chars_expanded, w, strides=[1, 1, 1, 1], padding="VALID")
+                conv = self.batch_norm(conv, self.is_train,name='bn1_%d' % i)
 
-            outputs,_=tf.nn.bidirectional_dynamic_rnn(lstm_fw_cell,lstm_bw_cell,output_rnn,dtype=tf.float32,scope="LSTM_2") #[batch_size,sequence_length,hidden_size*2] #creates a dynamic bidirectional recurrent neural network
-            output_rnn = tf.concat(outputs, axis=2)  # [batch_size,sequence_length,hidden_size*4]
+                h = tf.nn.relu(tf.nn.bias_add(conv, b))
 
-        output_rnn=tf.expand_dims(output_rnn,-1)
-        pooled = tf.nn.max_pool(output_rnn, ksize=[1, self.sequence_length, 1, 1], strides=[1, 1, 1, 1],padding='VALID', name="pool")
-        pooled=tf.reshape(pooled,[-1,self.hidden_size*4])
+                # Convolution Layer2
+                filter_shape1 = [filter_size, 1, self.num_filters, self.num_filters]
+                w1 = tf.Variable(tf.truncated_normal(filter_shape1, stddev=0.1), name="w2_%d" % i)
+                b1 = tf.Variable(tf.constant(0.1, shape=[self.num_filters]), name="bias2_%d" % i)
 
-        with tf.name_scope("output"):  # inputs: A `Tensor` of shape `[batch_size, dim]`.  The forward activations of the input network.
-            w_projection = tf.get_variable("w_projection", shape=[self.hidden_size * 2, self.num_classes],initializer=init_value)  # [embed_size,label_size]
-            b_projection = tf.get_variable("bias_projection", shape=[self.num_classes])  # [label_size]
-            logits = tf.matmul(pooled, w_projection) + b_projection  # [batch_size,num_classes]
-            self.out = tf.nn.sigmoid(logits)
+                conv = tf.nn.conv2d(h, w1, strides=[1, 1, 1, 1], padding="VALID")
+                conv = self.batch_norm(conv, self.is_train,name='bn2_%d' % i)
+
+                h1 = tf.nn.relu(tf.nn.bias_add(conv, b1))
+
+                # Maxpooling over the outputs
+                pooled = tf.nn.max_pool(h1,ksize=[1, self.sequence_length - 2*filter_size + 2, 1, 1],strides=[1, 1, 1, 1],padding='VALID',name="pool_%d" % i)
+                pooled_outputs.append(pooled)
+
+        # Combine all the pooled features
+        num_filters_total = self.num_filters * len(self.filter_sizes)
+        h_pool = tf.concat(pooled_outputs, 3)
+        h_pool_flat = tf.reshape(h_pool, [-1, num_filters_total])
+
+        # Add dropout
+        # with tf.name_scope("dropout"):
+        #     h_drop = tf.nn.dropout(h_pool_flat, self.dropout_keep_prob)
+        with tf.name_scope("liner"):
+            w1 = tf.Variable(tf.truncated_normal([num_filters_total, 1320],stddev=0.1), name='weight_line_1')
+            b1 = tf.Variable(tf.constant(0.1, shape=[1320]), name='bias_liner_1')
+            liner_out=tf.matmul(h_pool_flat,w1)+b1
+            liner_out=self.batch_norm(liner_out,self.is_train,name='bn_liner_1')
+            liner_out=tf.nn.relu(liner_out)
+
+            w2 = tf.Variable(tf.truncated_normal([1320, self.num_classes],stddev=0.1), name='weight_line_2')
+            b2 = tf.Variable(tf.constant(0.1, shape=[self.num_classes]), name='bias_liner_2')
+            liner_out2=tf.matmul(liner_out,w2)+b2
+
+        # Final (unnormalized) scores and predictions
+        with tf.name_scope("output"):
+            self.out = tf.nn.sigmoid(liner_out2)
 
         # Calculate mean cross-entropy loss
         with tf.name_scope("loss"):
-            l2_loss =tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name])#bias偏置变量不参与L2范数计算
-            losses = tf.nn.sigmoid_cross_entropy_with_logits(logits=logits, labels=self.input_y)
+            l2_loss =tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name])
+            losses = tf.nn.sigmoid_cross_entropy_with_logits(logits=liner_out2, labels=self.input_y)
             losses = tf.reduce_sum(losses,axis=1)
             losses = tf.reduce_mean(losses)
             self.loss=losses + self.l2_reg_lambda * l2_loss
@@ -84,26 +132,24 @@ class TextRNN(object):
                                                    self.decay_rate, staircase=True)
         optimizer = tf.train.AdamOptimizer(learning_rate)
 
-        var_expect_embedding = [v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
-        grads_and_vars = optimizer.compute_gradients(self.loss, var_list=var_expect_embedding)
+        var_expect_embedding=[v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
+        grads_and_vars = optimizer.compute_gradients(self.loss,var_list=var_expect_embedding)
         self.train_op = optimizer.apply_gradients(grads_and_vars, global_step=self.global_step)
 
         # optimizer1 = tf.train.AdamOptimizer(learning_rate)
-        grads_and_vars1 = optimizer.compute_gradients(self.loss)
+        grads_and_vars1=optimizer.compute_gradients(self.loss)
         self.train_op1 = optimizer.apply_gradients(grads_and_vars1, global_step=self.global_step)
         ##########################################################################################################
 
         var_expect_embedding = [v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
-        self.train_op_array = []
-        learning_rate_temp = 1e-3
+        self.train_op_array=[]
+        learning_rate_temp=1e-3
         for i in range(10):
-            self.train_op_array.append(
-                tf.train.AdamOptimizer(learning_rate_temp).minimize(self.loss, global_step=self.global_step,
-                                                                    var_list=var_expect_embedding))
-            learning_rate_temp /= 2.0
+            self.train_op_array.append(tf.train.AdamOptimizer(learning_rate_temp).minimize(self.loss,global_step=self.global_step,var_list=var_expect_embedding))
+            learning_rate_temp/=2.0
 
-        var_embedding = [v for v in tf.trainable_variables() if 'embedding_w' in v.name]
-        self.train_embedding_op = tf.train.AdamOptimizer(2e-4).minimize(self.loss, var_list=var_embedding)
+        var_embedding=[v for v in tf.trainable_variables() if 'embedding_w' in v.name]
+        self.train_embedding_op=tf.train.AdamOptimizer(2e-4).minimize(self.loss,var_list=var_embedding)
 
         self.buildSummaries()
 
@@ -111,7 +157,7 @@ class TextRNN(object):
         self.sess.run(tf.global_variables_initializer())
         self.Saver = tf.train.Saver()
 
-    def buildSummaries(self):
+    def buildSummaries(self,):
         # 创建记录文件
         #timestamp = str(int(time.time()))
         out_dir = os.path.abspath(os.path.join(os.path.curdir, "runs"))
@@ -246,19 +292,18 @@ class TextRNN(object):
         self.data.init_evalution()
         dev_iter = self.data.dev_batch_iter()
 
-        for x, y in dev_iter:
-            feed_dict = {self.input_x: x, self.input_y: y, self.dropout_keep_prob: 1.0, self.is_train: False}
-            summaries, loss, out, step = self.sess.run([self.dev_summary_op, self.loss, self.out, self.global_step],
-                                                       feed_dict=feed_dict)
+        for x,y in dev_iter:
+            feed_dict = {self.input_x: x, self.input_y: y, self.dropout_keep_prob: 1.0,self.is_train:False}
+            summaries, loss, out ,step= self.sess.run([self.dev_summary_op, self.loss, self.out,self.global_step],feed_dict=feed_dict)
 
             for i in range(len(out)):
-                self.data.evalution(out[i], y[i])
+                self.data.evalution(out[i],y[i])
 
         p_5, r_5, f1 = self.data.get_evalution_result()
 
         print("Evaluation: step {}, loss {:g}, precision {:g}, recall {:g}, f1 {:g}".format(step, loss, p_5, r_5, f1))
 
-        return p_5,r_5,f1
+        return p_5, r_5, f1
 
     def saveModel(self, dir=None):
         if (dir == None):
@@ -273,8 +318,10 @@ class TextRNN(object):
         self.Saver.restore(self.sess, "./"+dir+"/model.ckpt")
 
 def main():
-    rnn=TextRNN(mode=2)
-    rnn.trainModel()
+    cnn=TextCNN(mode=2)
+    cnn.trainModel()
+    # cnn.loadModel()
+    # cnn.testModel()
 
 if __name__ == '__main__':
     main()
