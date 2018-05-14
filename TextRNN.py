@@ -64,7 +64,7 @@ class TextRNN(object):
         pooled=tf.reshape(pooled,[-1,self.hidden_size*4])
 
         with tf.name_scope("output"):  # inputs: A `Tensor` of shape `[batch_size, dim]`.  The forward activations of the input network.
-            w_projection = tf.get_variable("w_projection", shape=[self.hidden_size * 2, self.num_classes],initializer=init_value)  # [embed_size,label_size]
+            w_projection = tf.get_variable("w_projection", shape=[self.hidden_size * 4, self.num_classes],initializer=init_value)  # [embed_size,label_size]
             b_projection = tf.get_variable("bias_projection", shape=[self.num_classes])  # [label_size]
             logits = tf.matmul(pooled, w_projection) + b_projection  # [batch_size,num_classes]
             self.out = tf.nn.sigmoid(logits)
