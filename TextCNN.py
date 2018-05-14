@@ -227,7 +227,7 @@ class TextCNN(object):
                     if f1>f1_max:
                         f1_max=f1
                         self.saveModel()
-                        f = open("./" + dir + '/info.txt', 'w')
+                        f = open("./" + self.Model_dir + '/info.txt', 'w')
                         time = datetime.datetime.now()
                         str = '第%d轮训练用时%ds\n' % (epochnum + 1, (time - self.starttime).seconds)
                         str += 'p_5 : %f , r_5 : %f , f1 : %f\n' % (p, r, f1)
@@ -255,11 +255,11 @@ class TextCNN(object):
                 feed_dict = {self.input_x: x_batch, self.input_y: y_batch, self.dropout_keep_prob: self.dropout,
                              self.is_train: True}
                 if epochnum>=1:
-                    _, summaries, loss, step = self.sess.run(
-                        [train_op_chioce, self.train_summary_op, self.loss, self.global_step], feed_dict=feed_dict)
-                else:
                     _,_, summaries, loss, step = self.sess.run(
                         [self.train_embedding_op,train_op_chioce, self.train_summary_op, self.loss, self.global_step], feed_dict=feed_dict)
+                else:
+                    _, summaries, loss, step = self.sess.run(
+                        [train_op_chioce, self.train_summary_op, self.loss, self.global_step], feed_dict=feed_dict)
                 self.train_summary_writer.add_summary(summaries, step)  # 对记录文件添加上边run出的记录和step数
 
                 if (batchnum % self.num_checkpoints == 0):
@@ -271,7 +271,7 @@ class TextCNN(object):
                     if f1 > f1_max:
                         f1_max = f1
                         self.saveModel()
-                        f=open("./"+dir+'/info.txt','w')
+                        f=open("./"+self.Model_dir+'/info.txt','w')
                         time = datetime.datetime.now()
                         str='第%d轮训练用时%ds\n' % (epochnum+1,(time-self.starttime).seconds)
                         str+='p_5 : %f , r_5 : %f , f1 : %f\n' % (p,r,f1)
