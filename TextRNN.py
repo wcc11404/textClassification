@@ -2,6 +2,7 @@ import tensorflow as tf
 import datetime
 # from zhihu_sample_dataset import dataset
 from zhihu_dataset import dataset
+from tensorflow.contrib import rnn
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
@@ -24,7 +25,7 @@ class TextRNN(object):
         self.dropout=1.0               #dropout比例
         self.learning_rate = tf.Variable(1e-2, trainable=False, name="learning_rate")  # ADD learning_rate
         self.batch_size=64
-        self.Model_dir = "./TextRNN"  # 模型参数默认保存位置
+        self.Model_dir = "TextRNN"  # 模型参数默认保存位置
 
         self.buildModel()
 
@@ -40,31 +41,23 @@ class TextRNN(object):
             embedded_chars = tf.nn.embedding_lookup(W, self.input_x)                                        #通过input_x查找对应字典的随机数
 
         with tf.name_scope("RNN"):
-            lstm_fw_cell = tf.contrib.rnn.BasicLSTMCell(self.hidden_size)  # forward direction cell
+            lstm_fw_cell = tf.contrib.rnn.BasicLSTMCell(self.hidden_size) # forward direction cell
             lstm_bw_cell = tf.contrib.rnn.BasicLSTMCell(self.hidden_size)  # backward direction cell
+            mlstm_fw_cell = rnn.MultiRNNCell([lstm_fw_cell]*2,state_is_tuple=True)
+            mlstm_bw_cell = rnn.MultiRNNCell([lstm_bw_cell]*2,state_is_tuple=True)
             # if self.dropout_keep_prob is not None:
             #     lstm_fw_cell = tf.contrib.rnn.DropoutWrapper(lstm_fw_cell, output_keep_prob=self.dropout_keep_prob)
             #     lstm_bw_cell = tf.contrib.rnn.DropoutWrapper(lstm_bw_cell, output_keep_prob=self.dropout_keep_prob)
 
-            outputs,_=tf.nn.bidirectional_dynamic_rnn(lstm_fw_cell,lstm_bw_cell,embedded_chars,dtype=tf.float32,scope="LSTM_1") #[batch_size,sequence_length,hidden_size] #creates a dynamic bidirectional recurrent neural network
+            outputs,_=tf.nn.bidirectional_dynamic_rnn(mlstm_fw_cell,mlstm_bw_cell,embedded_chars,dtype=tf.float32,scope="LSTM_1") #[batch_size,sequence_length,hidden_size] #creates a dynamic bidirectional recurrent neural network
             output_rnn = tf.concat(outputs, axis=2)  # [batch_size,sequence_length,hidden_size*2]
-
-
-            lstm_fw_cell = tf.contrib.rnn.BasicLSTMCell(self.hidden_size*2)  # forward direction cell
-            lstm_bw_cell = tf.contrib.rnn.BasicLSTMCell(self.hidden_size*2)  # backward direction cell
-            # if self.dropout_keep_prob is not None:
-            #     lstm_fw_cell = tf.contrib.rnn.DropoutWrapper(lstm_fw_cell, output_keep_prob=self.dropout_keep_prob)
-            #     lstm_bw_cell = tf.contrib.rnn.DropoutWrapper(lstm_bw_cell, output_keep_prob=self.dropout_keep_prob)
-
-            outputs,_=tf.nn.bidirectional_dynamic_rnn(lstm_fw_cell,lstm_bw_cell,output_rnn,dtype=tf.float32,scope="LSTM_2") #[batch_size,sequence_length,hidden_size*2] #creates a dynamic bidirectional recurrent neural network
-            output_rnn = tf.concat(outputs, axis=2)  # [batch_size,sequence_length,hidden_size*4]
 
         output_rnn=tf.expand_dims(output_rnn,-1)
         pooled = tf.nn.max_pool(output_rnn, ksize=[1, self.sequence_length, 1, 1], strides=[1, 1, 1, 1],padding='VALID', name="pool")
-        pooled=tf.reshape(pooled,[-1,self.hidden_size*4])
+        pooled=tf.reshape(pooled,[-1,self.hidden_size*2])
 
         with tf.name_scope("output"):  # inputs: A `Tensor` of shape `[batch_size, dim]`.  The forward activations of the input network.
-            w_projection = tf.get_variable("w_projection", shape=[self.hidden_size * 4, self.num_classes],initializer=init_value)  # [embed_size,label_size]
+            w_projection = tf.get_variable("w_projection", shape=[self.hidden_size * 2, self.num_classes],initializer=init_value)  # [embed_size,label_size]
             b_projection = tf.get_variable("bias_projection", shape=[self.num_classes])  # [label_size]
             logits = tf.matmul(pooled, w_projection) + b_projection  # [batch_size,num_classes]
             self.out = tf.nn.sigmoid(logits)
