@@ -221,6 +221,19 @@ class TextRNN(object):
                     print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                     print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, num_epoch, batchnum, batchmax))
 
+                if epochnum > 5 and batchnum == batchmax // 2:
+                    p, r, f1 = self.testModel()
+                    if f1 > f1_max:
+                        f1_max = f1
+                        self.saveModel()
+                        f = open("./" + self.Model_dir + '/info.txt', 'w')
+                        time = datetime.datetime.now()
+                        str = '第%d轮训练用时%ds\n' % (epochnum + 1, (time - self.starttime).seconds)
+                        str += 'p_5 : %f , r_5 : %f , f1 : %f\n' % (p, r, f1)
+                        f.write(str)
+                        f.close()
+                        print("saved")
+
                 if batchnum == batchmax-1:#batchnum == batchmax//2 or
                     p,r,f1 = self.testModel()
                     if f1 > f1_max:
