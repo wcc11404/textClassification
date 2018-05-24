@@ -19,6 +19,7 @@ class TextCNN(object):
         self.decay_steps = 2500
         self.decay_rate = 0.65
         self.learning_rate = tf.Variable(1e-3, trainable=False, name="learning_rate")  # ADD learning_rate
+        self.mode2_learning_rate = 1e-3
 
         self.num_checkpoints=100       #存模型的频率
         self.num_test=2500
@@ -144,7 +145,7 @@ class TextCNN(object):
         elif self.mode==2:
             var_expect_embedding = [v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
             train_adamop_array=[]
-            learning_rate_temp=1e-3
+            learning_rate_temp = self.mode2_learning_rate
             for i in range(10):
                 train_adamop_array.append(tf.train.AdamOptimizer(learning_rate_temp))#.minimize(self.loss,global_step=self.global_step,var_list=var_expect_embedding))
                 learning_rate_temp/=2.0

@@ -1,4 +1,3 @@
-import bcolz
 import json
 import os
 from collections import Counter
@@ -12,8 +11,8 @@ embedding_size=200
 max_abstract_perfile=300000
 max_abstract_perfile2=5000
 mode=2
-f_in_name="D:/wang/"
-f_out_name=f_in_name+"temp/"
+f_in_name="D:/bioasq2018/"
+f_out_name=f_in_name+""
 
 def process_line(line):
     line=line.split("\":")
@@ -53,6 +52,7 @@ def getLineIter():
 
             yield dict,line_num
             str = f.readline()
+
 def getLineIter2():
     with open(f_in_name + 'allMeSH_2018_process.txt', 'r', encoding="utf-8") as f:
         str = f.readline()
@@ -63,7 +63,7 @@ def getLineIter2():
             yield str, line_num
             str = f.readline()
 
-def readEmbedding(mode=1):  #1为小内存模式，2为大内存模式
+def readEmbedding():
     if not os.path.exists(f_in_name + 'model'):
         os.makedirs(f_in_name + 'model')
 
@@ -73,10 +73,7 @@ def readEmbedding(mode=1):  #1为小内存模式，2为大内存模式
             str = f.readline()
             vector = vec.readline()
             while str != "":
-                if mode==1:
-                    map[str.strip()] = vector
-                elif mode==2:
-                    map[str.strip()] = [float(w) for w in vector.split(' ')]
+                map[str.strip()] = vector
                 str = f.readline()
                 vector = vec.readline()
     # print(len(map))#1701041
@@ -86,7 +83,7 @@ def readEmbedding(mode=1):  #1为小内存模式，2为大内存模式
         pickle.dump(map, data_f)
 
 def all_abstract_word():
-    tt=[':',',','.','-','(',')']
+    tt = [':', ',', '.', '-', '(', ')', '%', ';', '=', '[', ']', '<', '>','\"', '+\\\\/-', '\'','&']
     list_stopwords=list(set(stopwords.words('english')))
     count=Counter()
     iter = getLineIter()
@@ -97,7 +94,7 @@ def all_abstract_word():
         abstract =line['abstractText']
         temp=word_tokenize(title.lower())
         temp.extend(word_tokenize(abstract.lower()))
-        temp=[word for word in temp if word not in tt and word not in list_stopwords]
+        temp=[word for word in temp if word not in list_stopwords]# and word not in tt]
         len_num+=len(temp)
 
         count.update(temp)
@@ -109,7 +106,7 @@ def all_abstract_word():
 
     f.close()
     print(count.most_common(100))
-    with open(f_in_name + 'model/all_abstact_word.pik', 'wb') as data_f:
+    with open(f_in_name + 'model/all_abstact_word1.pik', 'wb') as data_f:
         pickle.dump(count, data_f)
     print(len_num/13486072)
 
@@ -154,7 +151,7 @@ def process_title_abstract(title_abstract,map,mode,cache_embed):
 def process_abstract_main(mode):
     with open(f_in_name + 'model/embedding.pik', 'rb') as data_f:
         map=pickle.load(data_f)
-    with open(f_in_name + 'model/all_abstact_word.pik', 'rb') as f:
+    with open(f_in_name + 'model/all_abstact_word1.pik', 'rb') as f:
         count=pickle.load(f)
 
     if not os.path.exists(f_out_name + 'train_data_x'):
@@ -173,10 +170,17 @@ def process_abstract_main(mode):
     random_embed = list(float(w) for w in map['random_embed'].split(' '))
     zero_embed = list(float(w) for w in map['zero_embed'].split(' '))
     cache_embed['random_embed']=random_embed
-    cache_embed[zero_embed]=zero_embed
-    for tuplee in count.most_common(100):
+    cache_embed['zero_embed']=zero_embed
+    i=0
+    for tuplee in count.most_common(2000000):
         word, _ = tuplee
-        cache_embed[word]=list(float(w) for w in map[word].split(' '))
+        if word in map:
+            cache_embed[word]=list(float(w) for w in map[word].split(' '))
+            i+=1
+        if i==500000:
+            break
+    del count
+    print('finished cache_embed')
 
     iter=getLineIter2()
     abstract_array = []
@@ -239,7 +243,7 @@ def process_meshMajor(mode):
             temparray=one_hot(temparray)
         label_array.append(temparray)
 
-        if num % abstract_num==0:
+        if num % abstract_num == 0:
             with open(f_out_name + 'train_data_y/data_%d' % File_num, 'wb') as data_f:
                 pickle.dump(label_array,data_f)
             # bcolz.carray(a, rootdir='D:/wang/train_data_y/data_0', mode='w')

@@ -24,6 +24,7 @@ class TextRNN(object):
         self.num_test=1000
         self.dropout=1.0               #dropout比例
         self.learning_rate = tf.Variable(1e-2, trainable=False, name="learning_rate")  # ADD learning_rate
+        self.mode2_learning_rate = 1e-2
         self.batch_size=64
         self.Model_dir = "TextRNN"  # 模型参数默认保存位置
 
@@ -89,7 +90,7 @@ class TextRNN(object):
         elif self.mode==2:
             var_expect_embedding = [v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
             train_adamop_array = []
-            learning_rate_temp = 1e-3
+            learning_rate_temp = self.mode2_learning_rate
             for i in range(10):
                 train_adamop_array.append(tf.train.AdamOptimizer(
                     learning_rate_temp))  # .minimize(self.loss,global_step=self.global_step,var_list=var_expect_embedding))
@@ -220,7 +221,7 @@ class TextRNN(object):
                     print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                     print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, num_epoch, batchnum, batchmax))
 
-                if batchnum == batchmax//2 or batchnum == batchmax-1:
+                if batchnum == batchmax-1:#batchnum == batchmax//2 or
                     p,r,f1 = self.testModel()
                     if f1 > f1_max:
                         f1_max = f1
