@@ -1,5 +1,3 @@
-import bcolz
-import json
 import os
 from collections import Counter
 import pickle
@@ -14,7 +12,7 @@ embedding_size=200
 max_train_data=13486072
 label_num=28340
 max_abstract_perfile=300000
-f_in_name="D:/wang/"
+f_in_name="D:/bioasq2018/"
 f_out_name=f_in_name+"out/"
 
 def process_line(line):
@@ -66,7 +64,7 @@ def getLineIter2():
             yield str, line_num
             str = f.readline()
 
-def readEmbedding():  #1为小内存模式，2为大内存模式
+def readEmbedding():
     if not os.path.exists(f_in_name + 'model'):
         os.makedirs(f_in_name + 'model')
 
@@ -265,7 +263,7 @@ def main():
 
     # readEmbedding()                   #预统计embedding信息，存储embedding模型，map['word']='str'形式
     # all_abstract_word()               #预统计所有title和abstract的单词信息，分词，去除停用词，标点符号，并用counter统计，存储处理后的word
-    # process_abstract_main()  #处理上一步处理后的word，将所有word转换成embedding（float形式），分批存储成pickle
+    process_abstract_main()  #处理上一步处理后的word，将所有word转换成embedding（float形式），分批存储成pickle
 
 if __name__ == '__main__':
     main()
