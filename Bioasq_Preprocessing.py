@@ -1,3 +1,4 @@
+import bcolz
 import json
 import os
 from collections import Counter
@@ -5,14 +6,16 @@ import pickle
 import random
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
+import shutil
 
 max_length=360
+embedding_num=1701041
 embedding_size=200
+max_train_data=13486072
+label_num=28340
 max_abstract_perfile=300000
-max_abstract_perfile2=5000
-mode=2
-f_in_name="D:/bioasq2018/"
-f_out_name=f_in_name+""
+f_in_name="D:/wang/"
+f_out_name=f_in_name+"out/"
 
 def process_line(line):
     line=line.split("\":")
@@ -63,7 +66,7 @@ def getLineIter2():
             yield str, line_num
             str = f.readline()
 
-def readEmbedding():
+def readEmbedding():  #1为小内存模式，2为大内存模式
     if not os.path.exists(f_in_name + 'model'):
         os.makedirs(f_in_name + 'model')
 
@@ -76,6 +79,7 @@ def readEmbedding():
                 map[str.strip()] = vector
                 str = f.readline()
                 vector = vec.readline()
+
     # print(len(map))#1701041
     map['zero_embed'] = " ".join(['0' for _ in range(embedding_size)])
     map['random_embed'] = " ".join(['%f' % random.uniform(-0.25,0.25) for _ in range(embedding_size)])
@@ -83,7 +87,7 @@ def readEmbedding():
         pickle.dump(map, data_f)
 
 def all_abstract_word():
-    tt = [':', ',', '.', '-', '(', ')', '%', ';', '=', '[', ']', '<', '>','\"', '+\\\\/-', '\'','&']
+    tt=[':',',','.','-','(',')']
     list_stopwords=list(set(stopwords.words('english')))
     count=Counter()
     iter = getLineIter()
@@ -102,37 +106,23 @@ def all_abstract_word():
         f.write(' '.join(temp)+'\n')
 
         if num%5000==0:
-            print('finished %f%%'% (num/13486072*100))
+            print('finished %f%%'% (num/max_train_data*100))
 
     f.close()
     print(count.most_common(100))
-    with open(f_in_name + 'model/all_abstact_word1.pik', 'wb') as data_f:
+    with open(f_in_name + 'model/all_abstact_word.pik', 'wb') as data_f:
         pickle.dump(count, data_f)
-    print(len_num/13486072)
+    print(len_num/max_train_data)
 
-def shit():
-    # with open(f_in_name + 'model/embedding.pik', 'rb') as data_f:
-    #     map=pickle.load(data_f)
-    # with open(f_in_name + 'model/all_abstact_word.pik', 'rb') as data_f:
-    #     count=pickle.load(data_f)
-    # print(count.most_common(100))
-    pass
-
-def process_title_abstract(title_abstract,map,mode,cache_embed):
+def process_title_abstract(title_abstract,map,cache_embed):
     array = []
     for i,word in enumerate(title_abstract):
-        if mode==1:
-            if word in map:
-                n = map[word]
-            else:
-                n = map['random_embed']  # 出现次数少的字符
-        elif mode==2:
-            if word in cache_embed:
-                n = cache_embed[word]
-            elif word in map:
-                n = list(float(w) for w in map[word].split(' '))
-            else:
-                n = cache_embed['random_embed']
+        if word in cache_embed:
+            n = cache_embed[word]
+        elif word in map:
+            n = list(float(w) for w in map[word].split(' '))
+        else:
+            n = cache_embed['random_embed']
 
         array.append(n)
 
@@ -141,29 +131,22 @@ def process_title_abstract(title_abstract,map,mode,cache_embed):
 
     length = max_length - len(array)
     for i in range(length):
-        n=map['zero_embed']
-        if mode==2:
-            n = cache_embed['zero_embed']
+        n = cache_embed['zero_embed']
         array.append(n)  # 补齐字符
 
     return array
 
-def process_abstract_main(mode):
+def process_abstract_main():
     with open(f_in_name + 'model/embedding.pik', 'rb') as data_f:
         map=pickle.load(data_f)
-    with open(f_in_name + 'model/all_abstact_word1.pik', 'rb') as f:
+    with open(f_in_name + 'model/all_abstact_word.pik', 'rb') as f:
         count=pickle.load(f)
 
     if not os.path.exists(f_out_name + 'train_data_x'):
         os.makedirs(f_out_name + 'train_data_x')
     else:
-        os.removedirs(f_out_name + 'train_data_x')
+        shutil.rmtree(f_out_name + 'train_data_x')
         os.makedirs(f_out_name + 'train_data_x')
-
-    if mode==1:
-        abstract_num=max_abstract_perfile
-    elif mode==2:
-        abstract_num=max_abstract_perfile2
 
     #建立embed快速缓存
     cache_embed={}
@@ -177,26 +160,26 @@ def process_abstract_main(mode):
         if word in map:
             cache_embed[word]=list(float(w) for w in map[word].split(' '))
             i+=1
+        # else:
+        #     print(word)
         if i==500000:
             break
-    del count
     print('finished cache_embed')
+    del count
 
     iter=getLineIter2()
     abstract_array = []
     File_num = 0
     for line,num in iter:
         line=line.strip().split(' ')
-        title_abstract = process_title_abstract(line, map, mode, cache_embed)
+        title_abstract = process_title_abstract(line, map, cache_embed)
         abstract_array.append(title_abstract)
 
-        if num%100==0:
-            print(num)
-        if num % abstract_num == 0:
+        if num % max_abstract_perfile == 0:
             with open(f_out_name + 'train_data_x/data_%d' % File_num, 'wb') as data_f:
                 pickle.dump(abstract_array,data_f)
             # bcolz.carray(abstract_array, rootdir=f_out_name + 'train_data_x/data_%d' % File_num, mode='w')
-            print("saved file %d/%d" % (File_num,13486072//abstract_num+1))
+            print("saved file %d/%d" % (File_num,13486072//max_abstract_perfile+1))
             File_num += 1
             del abstract_array
             abstract_array = []
@@ -205,28 +188,23 @@ def process_abstract_main(mode):
         with open(f_out_name + 'train_data_x/data_%d' % File_num, 'wb') as data_f:
             pickle.dump(abstract_array, data_f)
         # bcolz.carray(abstract_array, rootdir=f_out_name + 'train_data_x/data_%d' % File_num, mode='w')
-        print("saved file %d/%d" % (File_num, 13486072 // abstract_num + 1))
+        print("saved file %d/%d" % (File_num, max_train_data // max_abstract_perfile + 1))
 
 def one_hot(x):
-    result=[0 for _ in range(28340)]
+    result=[0 for _ in range(label_num)]
     for i in x:
         result[i]=1
     return result
 
-def process_meshMajor(mode):
+def process_meshMajor():
     with open(f_in_name + 'model/label_map.pik', 'rb') as data_f:
         label_map=pickle.load(data_f)
     if not os.path.exists(f_out_name + 'train_data_y'):
         os.makedirs(f_out_name + 'train_data_y')
     else:
-        os.removedirs(f_out_name + 'train_data_y')
+        shutil.rmtree(f_out_name + 'train_data_y')
         os.makedirs(f_out_name + 'train_data_y')
     # print(len(label_map))#28340
-
-    if mode==1:
-        abstract_num=max_abstract_perfile
-    elif mode==2:
-        abstract_num=max_abstract_perfile2
 
     iter = getLineIter()
     File_num = 0
@@ -239,15 +217,14 @@ def process_meshMajor(mode):
                 temparray.append(label_map[label])
             except:
                 print('loss '+ label)
-        if mode==2:
-            temparray=one_hot(temparray)
+        #temparray=one_hot(temparray)
         label_array.append(temparray)
 
-        if num % abstract_num == 0:
+        if num % max_abstract_perfile==0:
             with open(f_out_name + 'train_data_y/data_%d' % File_num, 'wb') as data_f:
                 pickle.dump(label_array,data_f)
             # bcolz.carray(a, rootdir='D:/wang/train_data_y/data_0', mode='w')
-            print("saved file %d/%d" % (File_num, 13486072 // abstract_num + 1))
+            print("saved file %d/%d" % (File_num, max_train_data // max_abstract_perfile + 1))
             File_num += 1
             del label_array
             label_array=[]
@@ -255,7 +232,7 @@ def process_meshMajor(mode):
     if len(label_array)!=0:
         with open(f_out_name + 'train_data_y/data_%d' % File_num, 'wb') as data_f:
             pickle.dump(label_array, data_f)
-        print("saved file %d/%d" % (File_num, 13486072 // abstract_num + 1))
+        print("saved file %d/%d" % (File_num, max_train_data // max_abstract_perfile + 1))
 
 def process_meshMajor_main():
     count=Counter()
@@ -268,7 +245,7 @@ def process_meshMajor_main():
         count.update(meshMajor)
 
         if num%500000==0:
-            print('finished %f%%'% (num/13486072*100))
+            print('finished %f%%'% (num/max_train_data*100))
 
     # print(count.most_common())
     label_map = {}
@@ -284,11 +261,11 @@ def process_meshMajor_main():
 
 def main():
     # process_meshMajor_main()          #预统计label信息，存储label编码模型
-    # process_meshMajor(mode=mode)      #替换所有label为其编码，并分批存储成pickle
+    process_meshMajor()      #替换所有label为其编码，并分批存储成pickle
 
     # readEmbedding()                   #预统计embedding信息，存储embedding模型，map['word']='str'形式
-    all_abstract_word()                 #预统计所有title和abstract的单词信息，分词，去除停用词，标点符号，并用counter统计，存储处理后的word
-    # process_abstract_main(mode=mode)  #处理上一步处理后的word，将所有word转换成embedding（float形式），分批存储成pickle
+    # all_abstract_word()               #预统计所有title和abstract的单词信息，分词，去除停用词，标点符号，并用counter统计，存储处理后的word
+    # process_abstract_main()  #处理上一步处理后的word，将所有word转换成embedding（float形式），分批存储成pickle
 
 if __name__ == '__main__':
     main()
