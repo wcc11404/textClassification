@@ -221,7 +221,7 @@ class TextRNN(object):
                     print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                     print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, num_epoch, batchnum, batchmax))
 
-                if epochnum > 5 and batchnum == batchmax // 2:
+                if epochnum == num_epoch-1 and batchnum == batchmax // 2:
                     p, r, f1 = self.testModel()
                     if f1 > f1_max:
                         f1_max = f1
