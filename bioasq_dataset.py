@@ -1,13 +1,12 @@
 import numpy as np
 import pickle
-import math
 import datetime
 
 class dataset(object):
     def __init__(self,mode=1):
-        self.data_dir = "E:/bioasq_data/"
-        self.train_data_x_dir = self.data_dir + "train_data_x/data_"
-        self.train_data_y_dir = self.data_dir + "train_data_y/data_"
+        self.data_dir = "D:/wang/"
+        self.train_data_x_dir = self.data_dir + "out/train_data_x/data_"
+        self.train_data_y_dir = self.data_dir + "out/train_data_y/data_"
 
         self.max_sentence_size=360
         self.vy_num=28340
@@ -42,20 +41,14 @@ class dataset(object):
     def train_batch_iter(self, batch_size, num_epochs=0):
         # for epoch in range(num_epochs):
         for i in range(self.max_train_file_num+1):
-            print('start %d' % i)
             with open(self.train_data_x_dir + '%d' % i, 'rb') as f:
                 temp_data_x=pickle.load(f)
             with open(self.train_data_y_dir + '%d' % i, 'rb') as f:
                 temp_data_y=pickle.load(f)
-            print("shit")
 
             train_num=len(temp_data_x)
             tempnum=(train_num-1)//batch_size+1
-            starttime = datetime.datetime.now()
             for k in range(tempnum):
-                if k==20:
-                    endtime = datetime.datetime.now()
-                    print((endtime-starttime).seconds)
                 X = []
                 Y = []
                 min_num=k*batch_size
@@ -127,20 +120,26 @@ class dataset(object):
             index_list = np.argsort(logits)[-top_number:]
             index_list = index_list[::-1]
         else:
-            index_list = np.where((logits > maximin) & (logits <= minimax))
+            logits=np.array(logits)
+            index_list = np.where((logits > maximin) & (logits <= minimax))[0]
         return index_list
 
 def main():
     data = dataset()
 
-    starttime = datetime.datetime.now()
-
-    iter=data.train_batch_iter(100)
-    for x,y,_,_ in iter:
-        pass
-
-    endtime = datetime.datetime.now()
-    print((endtime - starttime).seconds)
+    # starttime = datetime.datetime.now()
+    #
+    # iter=data.train_batch_iter(100)
+    # for x,y,a,b in iter:
+    #     if a%100==0:
+    #         print("%d/%d" %(a,b))
+    #
+    # endtime = datetime.datetime.now()
+    # print((endtime - starttime).seconds)
+    x=[0.6,0.7,0.8,0.9]
+    y=[1,1,1,1]
+    data.evalution(x,y)
+    print(data.get_evalution_result())
 
 if __name__ == '__main__':
-  main()
+    main()
