@@ -16,6 +16,7 @@ class dataset(object):
         self.max_train_file_num=self.max_file_num-1 #0-43号文件作为训练文件
 
         self.mode=mode
+        self.name='bioasq'
 
         self.init_evalution()
 
@@ -59,9 +60,9 @@ class dataset(object):
                     y = self.process_Y(temp_data_y[j])
                     X.append(x)
                     Y.append(y)
-                yield X,Y,k,tempnum
+                yield X,Y,k+i*tempnum,tempnum*(self.max_file_num+1)
 
-    def dev_batch_iter(self,batch_size=100):
+    def dev_batch_iter(self,batch_size=50):
         with open(self.train_data_x_dir + '%d' % self.max_train_file_num, 'rb') as f:
             temp_data_x=pickle.load(f)
         with open(self.train_data_y_dir + '%d' % self.max_train_file_num, 'rb') as f:
@@ -69,7 +70,7 @@ class dataset(object):
 
         train_num=len(temp_data_x)
         tempnum=(train_num-1)//batch_size+1
-        for k in range(tempnum):
+        for k in range(200):
             X = []
             Y = []
             min_num=k*batch_size

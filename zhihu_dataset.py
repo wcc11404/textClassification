@@ -32,6 +32,8 @@ class dataset(object):
 
         self.init_evalution()
 
+        self.name='zhihu'
+
     def get_param(self):
         #return 最长句子长度，输出维数，输入字典维数,输入字典内容维数(embedding_size)
         return self.max_sentence_size,self.vy_num,self.vx_num,self.vx_size

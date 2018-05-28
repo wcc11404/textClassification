@@ -24,7 +24,7 @@ class TextCNN(object):
         self.num_checkpoints=100       #存模型的频率
         self.num_test=2500
         self.dropout=0.5               #dropout比例
-        self.batch_size=128
+        self.batch_size=100
         self.Model_dir = "TextCNN"  # 模型参数默认保存位置
 
         self.is_train= tf.placeholder(tf.bool)
@@ -54,7 +54,10 @@ class TextCNN(object):
             return x
 
     def buildModel(self):
-        self.input_x = tf.placeholder(tf.int32, [None, self.sequence_length], name="input_x")
+        if self.vocab_size!=0:
+            self.input_x = tf.placeholder(tf.int32, [None, self.sequence_length], name="input_x")
+        else :
+            self.input_x = tf.placeholder(tf.float32, [None, self.sequence_length,self.embedding_size], name="input_x")
         self.input_y = tf.placeholder(tf.float32, [None, self.num_classes], name="input_y")
         self.dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
 
@@ -107,7 +110,10 @@ class TextCNN(object):
         # with tf.name_scope("dropout"):
         #     h_drop = tf.nn.dropout(h_pool_flat, self.dropout_keep_prob)
         with tf.name_scope("liner"):
-            temp_num=(num_filters_total+self.num_classes)//2
+            if self.vocab_size!=0:
+                temp_num=(num_filters_total+self.num_classes)//2
+            else:
+                temp_num=1000
             w1 = tf.Variable(tf.truncated_normal([num_filters_total, temp_num],stddev=0.1), name='weight_line_1')
             b1 = tf.Variable(tf.constant(0.1, shape=[temp_num]), name='bias_liner_1')
             liner_out=tf.matmul(h_pool_flat,w1)+b1
@@ -163,15 +169,17 @@ class TextCNN(object):
             self.train_op_array=[]
             for i in range(10):
                 self.train_op_array.append(train_adamop_array[i].apply_gradients(zip(grads1,var_expect_embedding)))
-            self.train_embedding_op=train_embedding_adamop.apply_gradients(zip(grads2,var_embedding))
+            if self.vocab_size!=0:
+                self.train_embedding_op=train_embedding_adamop.apply_gradients(zip(grads2,var_embedding))
 
         self.buildSummaries()
 
         # 初始化变量
         self.sess.run(tf.global_variables_initializer())
+
         self.Saver = tf.train.Saver()
 
-    def buildSummaries(self,):
+    def buildSummaries(self):
         # 创建记录文件
         #timestamp = str(int(time.time()))
         out_dir = os.path.abspath(os.path.join(os.path.curdir, "runs"))
@@ -267,7 +275,7 @@ class TextCNN(object):
 
                 feed_dict = {self.input_x: x_batch, self.input_y: y_batch, self.dropout_keep_prob: self.dropout,
                              self.is_train: True}
-                if epochnum>=1:
+                if self.vocab_size!=0 and epochnum>=1:
                     _,_, summaries, loss, step = self.sess.run(
                         [self.train_embedding_op,train_op_chioce, self.train_summary_op, self.loss, self.global_step], feed_dict=feed_dict)
                 else:
@@ -279,15 +287,15 @@ class TextCNN(object):
                     print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                     print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, num_epoch, batchnum, batchmax))
 
-                if batchnum == batchmax-1:#batchnum == batchmax//2 or
+                if batchnum%3000==0 and batchnum == batchmax-1:#batchnum == batchmax//2 or
                     p,r,f1 = self.testModel()
                     if f1 > f1_max:
                         f1_max = f1
                         self.saveModel()
-                        f=open("./"+self.Model_dir+'/info.txt','w')
+                        f=open("./"+self.Model_dir+'_'+self.data.name+'/info.txt','w')
                         time = datetime.datetime.now()
                         str='第%d轮训练用时%ds\n' % (epochnum+1,(time-self.starttime).seconds)
-                        str+='p_5 : %f , r_5 : %f , f1 : %f\n' % (p,r,f1)
+                        str+='p : %f , r : %f , f1 : %f\n' % (p,r,f1)
                         f.write(str)
                         f.close()
                         print("saved")
@@ -313,22 +321,22 @@ class TextCNN(object):
             for i in range(len(out)):
                 self.data.evalution(out[i],y[i])
 
-        p_5, r_5, f1 = self.data.get_evalution_result()
+        p, r, f1 = self.data.get_evalution_result()
 
-        print("Evaluation: step {}, loss {:g}, precision {:g}, recall {:g}, f1 {:g}".format(step, loss, p_5, r_5, f1))
+        print("Evaluation: step {}, loss {:g}, precision {:g}, recall {:g}, f1 {:g}".format(step, loss, p, r, f1))
 
-        return p_5, r_5, f1
+        return p, r, f1
 
     def saveModel(self, dir=None):
         if (dir == None):
-            dir = self.Model_dir
+            dir = self.Model_dir+'_'+self.data.name
         if not os.path.exists(dir):
             os.makedirs(dir)
         self.Saver.save(self.sess, dir + "/model.ckpt")
 
     def loadModel(self,dir=None):
         if (dir == None):
-            dir = self.Model_dir
+            dir = self.Model_dir+'_'+self.data.name
         self.Saver.restore(self.sess, "./"+dir+"/model.ckpt")
 
 def main():
