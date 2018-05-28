@@ -129,7 +129,7 @@ class dataset(object):
                 x,y=self.get_information_from_line(line)
                 X.append(x)
                 Y.append(y)
-            yield X,Y,k+1,tempnum+1
+            yield X,Y,k+1,tempnum
 
         f.close()
 
