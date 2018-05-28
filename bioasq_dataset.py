@@ -81,7 +81,7 @@ class dataset(object):
                 y = self.process_Y(temp_data_y[j])
                 X.append(x)
                 Y.append(y)
-            yield X,Y,k,tempnum
+            yield X,Y
 
     def init_evalution(self):
         self.fenzi = 0.0
