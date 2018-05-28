@@ -1,7 +1,7 @@
 import tensorflow as tf
 import datetime
-from bioasq_dataset import dataset
-# from zhihu_dataset import dataset
+# from bioasq_dataset import dataset
+from zhihu_dataset import dataset
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
@@ -16,14 +16,13 @@ class TextCNN(object):
         self.filter_sizes=[1,2,3,4,5]       #cnn    filter大小,kernel为[filter,embedding_size]
         self.num_filters=128            #cnn    filter数量
         self.l2_reg_lambda = 0.0001     #l2范数的学习率
-        self.decay_steps = 2500
-        self.decay_rate = 0.65
+        # self.decay_steps = 2500
+        # self.decay_rate = 0.65
         self.learning_rate = tf.Variable(1e-3, trainable=False, name="learning_rate")  # ADD learning_rate
         self.mode2_learning_rate = 1e-3
 
-        self.num_checkpoints=100       #存模型的频率
-        self.num_test=2500
-        self.dropout=0.5               #dropout比例
+        self.num_checkpoints=100       #打印的频率
+        self.dropout=1.0               #dropout比例
         self.batch_size=100
         self.Model_dir = "TextCNN"  # 模型参数默认保存位置
 
@@ -139,38 +138,38 @@ class TextCNN(object):
         # Define Training procedure
         self.global_step = tf.Variable(0, name="global_step", trainable=False)
         ##########################################  简版训练op  #################################################
-        if self.mode==1:
-            learning_rate = tf.train.exponential_decay(self.learning_rate, self.global_step, self.decay_steps,
-                                                       self.decay_rate, staircase=True)
-            optimizer = tf.train.AdamOptimizer(learning_rate)
+        # if self.mode==1:
+        #     learning_rate = tf.train.exponential_decay(self.learning_rate, self.global_step, self.decay_steps,
+        #                                                self.decay_rate, staircase=True)
+        #     optimizer = tf.train.AdamOptimizer(learning_rate)
+        #
+        #     var_expect_embedding=[v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
+        #     grads_and_vars = optimizer.compute_gradients(self.loss,var_list=var_expect_embedding)
+        #     self.train_op = optimizer.apply_gradients(grads_and_vars, global_step=self.global_step)
+        #
+        #     # optimizer1 = tf.train.AdamOptimizer(learning_rate)
+        #     grads_and_vars1=optimizer.compute_gradients(self.loss)
+        #     self.train_op1 = optimizer.apply_gradients(grads_and_vars1, global_step=self.global_step)
+        # ##########################################################################################################
+        # elif self.mode==2:
+        var_expect_embedding = [v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
+        train_adamop_array=[]
+        learning_rate_temp = self.mode2_learning_rate
+        for i in range(10):
+            train_adamop_array.append(tf.train.AdamOptimizer(learning_rate_temp))#.minimize(self.loss,global_step=self.global_step,var_list=var_expect_embedding))
+            learning_rate_temp/=2.0
+        var_embedding=[v for v in tf.trainable_variables() if 'embedding_w' in v.name]
+        train_embedding_adamop=tf.train.AdamOptimizer(2e-4)#.minimize(self.loss,var_list=var_embedding)
 
-            var_expect_embedding=[v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
-            grads_and_vars = optimizer.compute_gradients(self.loss,var_list=var_expect_embedding)
-            self.train_op = optimizer.apply_gradients(grads_and_vars, global_step=self.global_step)
+        grads=tf.gradients(self.loss,var_expect_embedding+var_embedding)
+        grads1=grads[:len(var_expect_embedding)]
+        grads2=grads[len(var_expect_embedding):]
 
-            # optimizer1 = tf.train.AdamOptimizer(learning_rate)
-            grads_and_vars1=optimizer.compute_gradients(self.loss)
-            self.train_op1 = optimizer.apply_gradients(grads_and_vars1, global_step=self.global_step)
-        ##########################################################################################################
-        elif self.mode==2:
-            var_expect_embedding = [v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
-            train_adamop_array=[]
-            learning_rate_temp = self.mode2_learning_rate
-            for i in range(10):
-                train_adamop_array.append(tf.train.AdamOptimizer(learning_rate_temp))#.minimize(self.loss,global_step=self.global_step,var_list=var_expect_embedding))
-                learning_rate_temp/=2.0
-            var_embedding=[v for v in tf.trainable_variables() if 'embedding_w' in v.name]
-            train_embedding_adamop=tf.train.AdamOptimizer(2e-4)#.minimize(self.loss,var_list=var_embedding)
-
-            grads=tf.gradients(self.loss,var_expect_embedding+var_embedding)
-            grads1=grads[:len(var_expect_embedding)]
-            grads2=grads[len(var_expect_embedding):]
-
-            self.train_op_array=[]
-            for i in range(10):
-                self.train_op_array.append(train_adamop_array[i].apply_gradients(zip(grads1,var_expect_embedding)))
-            if self.vocab_size!=0:
-                self.train_embedding_op=train_embedding_adamop.apply_gradients(zip(grads2,var_embedding))
+        self.train_op_array=[]
+        for i in range(10):
+            self.train_op_array.append(train_adamop_array[i].apply_gradients(zip(grads1,var_expect_embedding)))
+        if self.vocab_size!=0:
+            self.train_embedding_op=train_embedding_adamop.apply_gradients(zip(grads2,var_embedding))
 
         self.buildSummaries()
 
@@ -215,10 +214,10 @@ class TextCNN(object):
         self.dev_summary_writer = tf.summary.FileWriter(dev_summary_dir, self.sess.graph)
 
     def trainModel(self,num_epoch=10):
-        if self.mode==1:
-            self.trainModel1(num_epoch)
-        elif self.mode==2:
-            self.trainModel2(num_epoch)
+        # if self.mode==1:
+        #     self.trainModel1(num_epoch)
+        # elif self.mode==2:
+        self.trainModel2(num_epoch)
 
     def trainModel1(self,num_epoch=10):
         train_op_chioce=self.train_op
@@ -266,6 +265,7 @@ class TextCNN(object):
 
         print("start training")
         self.starttime = datetime.datetime.now()
+        self.write_log_infomation("start time : "+ datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),True)
 
         for epochnum in range(num_epoch):
             batches = self.data.train_batch_iter(self.batch_size, num_epoch)  # batch迭代器
@@ -287,28 +287,41 @@ class TextCNN(object):
                     print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                     print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, num_epoch, batchnum, batchmax))
 
-                if batchnum%3000==0 and batchnum == batchmax-1:#batchnum == batchmax//2 or
-                    p,r,f1 = self.testModel()
+                if batchnum%3000==0 or (epochnum == num_epoch-1 and batchnum == batchmax // 2):
+                    p, r, f1 = self.testModel()
                     if f1 > f1_max:
                         f1_max = f1
                         self.saveModel()
-                        f=open("./"+self.Model_dir+'_'+self.data.name+'/info.txt','w')
-                        time = datetime.datetime.now()
-                        str='第%d轮训练用时%ds\n' % (epochnum+1,(time-self.starttime).seconds)
-                        str+='p : %f , r : %f , f1 : %f\n' % (p,r,f1)
-                        f.write(str)
-                        f.close()
                         print("saved")
-                    else:
-                        self.loadModel()
-                    train_num += 1
-                    if train_num < 10:
-                        train_op_chioce = self.train_op_array[train_num]
-                    else:
-                        return
+                    str = "\n第%d轮训练一半\n时间 : " % (epochnum + 1)
+                    str += datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    str += '\np : %f , r : %f , f1 : %f\n' % (p, r, f1)
+                    self.write_log_infomation(str)
+
+            # 结束一轮训练后，测试
+            p, r, f1 = self.testModel()
+            if f1 > f1_max:
+                f1_max = f1
+                self.saveModel()
+                print("saved")
+            else:
+                self.loadModel()
+
+            str = "\n第%d轮训练结束\n时间 : " % (epochnum + 1)
+            str += datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            str += '\np : %f , r : %f , f1 : %f\n' % (p, r, f1)
+            self.write_log_infomation(str)
+            train_num += 1
+
+            if train_num < 10:
+                train_op_chioce = self.train_op_array[train_num]
+            else:
+                break
 
             print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             print('epoch %d finish' % (epochnum + 1))
+
+        self.write_log_infomation('\n最大F值为 : %f' % f1_max)
 
     def testModel(self):
         self.data.init_evalution()
@@ -339,8 +352,18 @@ class TextCNN(object):
             dir = self.Model_dir+'_'+self.data.name
         self.Saver.restore(self.sess, "./"+dir+"/model.ckpt")
 
+    def write_log_infomation(self,str,init=False):
+        if init:
+            if not os.path.exists(self.Model_dir + '_' + self.data.name):
+                os.makedirs(self.Model_dir + '_' + self.data.name)
+            f = open("./" + self.Model_dir + '_' + self.data.name + '/info.txt', 'w')
+        else:
+            f = open("./" + self.Model_dir + '_' + self.data.name + '/info.txt', 'a')
+        f.write(str)
+        f.close()
+
 def main():
-    cnn=TextCNN(mode=2)
+    cnn=TextCNN(mode=1)
     cnn.trainModel()
     # cnn.loadModel()
     # cnn.testModel()
