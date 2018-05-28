@@ -1,7 +1,7 @@
 import tensorflow as tf
 import datetime
-# from bioasq_dataset import dataset
-from zhihu_dataset import dataset
+from bioasq_dataset import dataset
+# from zhihu_dataset import dataset
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
