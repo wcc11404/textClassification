@@ -70,7 +70,7 @@ class dataset(object):
 
         train_num=len(temp_data_x)
         tempnum=(train_num-1)//batch_size+1
-        for k in range(200):
+        for k in range(tempnum):
             X = []
             Y = []
             min_num=k*batch_size

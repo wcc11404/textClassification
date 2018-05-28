@@ -287,7 +287,7 @@ class TextCNN(object):
                     print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                     print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, num_epoch, batchnum, batchmax))
 
-                if batchnum%3000==0 or (epochnum == num_epoch-1 and batchnum == batchmax // 2):
+                if batchnum%12000==0 or (epochnum == num_epoch-1 and batchnum == batchmax // 2):
                     p, r, f1 = self.testModel()
                     if f1 > f1_max:
                         f1_max = f1
@@ -336,7 +336,7 @@ class TextCNN(object):
 
         p, r, f1 = self.data.get_evalution_result()
 
-        print("Evaluation: step {}, loss {:g}, precision {:g}, recall {:g}, f1 {:g}".format(step, loss, p, r, f1))
+        print("Evaluation: precision {:g}, recall {:g}, f1 {:g}".format(p, r, f1))
 
         return p, r, f1
 

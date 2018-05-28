@@ -270,7 +270,7 @@ class TextRNN(object):
 
         p, r, f1 = self.data.get_evalution_result()
 
-        print("Evaluation: step {}, loss {:g}, precision {:g}, recall {:g}, f1 {:g}".format(step, loss, p, r, f1))
+        print("Evaluation: precision {:g}, recall {:g}, f1 {:g}".format(p, r, f1))
 
         return p, r, f1
 
