@@ -22,7 +22,7 @@ class Inception(object):
         self.num_checkpoints = 100  # 存模型的频率
         self.l2_reg_lambda = 0.0001     #l2范数的学习率
         self.dropout=0.5               #dropout比例
-        self.batch_size=64
+        self.batch_size=100
         self.Model_dir = "Inception"  # 模型参数默认保存位置
         self.is_train= tf.placeholder(tf.bool)
 
