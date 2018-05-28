@@ -1,7 +1,7 @@
 import tensorflow as tf
 import datetime
-# from zhihu_sample_dataset import dataset
-from zhihu_dataset import dataset
+from bioasq_dataset import dataset
+# from zhihu_dataset import dataset
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
@@ -60,9 +60,12 @@ class TextCNN(object):
 
         # Embedding layer
         init_value=tf.random_normal_initializer(stddev=0.1)
-        with tf.name_scope("embedding"):
-            W = tf.Variable(self.data.load_vocabulary(),name="embedding_w")
-            embedded_chars = tf.nn.embedding_lookup(W, self.input_x)                                        #通过input_x查找对应字典的随机数
+        if self.vocab_size!=0:
+            with tf.name_scope("embedding"):
+                W = tf.Variable(self.data.load_vocabulary(),name="embedding_w")
+                embedded_chars = tf.nn.embedding_lookup(W, self.input_x)                                        #通过input_x查找对应字典的随机数
+        else:
+            embedded_chars=self.input_x
 
         embedded_chars_expanded = tf.expand_dims(embedded_chars, -1)#将[none,56,128]后边加一维，变成[none,56,128,1]
 
@@ -104,13 +107,14 @@ class TextCNN(object):
         # with tf.name_scope("dropout"):
         #     h_drop = tf.nn.dropout(h_pool_flat, self.dropout_keep_prob)
         with tf.name_scope("liner"):
-            w1 = tf.Variable(tf.truncated_normal([num_filters_total, 1320],stddev=0.1), name='weight_line_1')
-            b1 = tf.Variable(tf.constant(0.1, shape=[1320]), name='bias_liner_1')
+            temp_num=(num_filters_total+self.num_classes)//2
+            w1 = tf.Variable(tf.truncated_normal([num_filters_total, temp_num],stddev=0.1), name='weight_line_1')
+            b1 = tf.Variable(tf.constant(0.1, shape=[temp_num]), name='bias_liner_1')
             liner_out=tf.matmul(h_pool_flat,w1)+b1
             liner_out=self.batch_norm(liner_out,self.is_train,name='bn_liner_1')
             liner_out=tf.nn.relu(liner_out)
 
-            w2 = tf.Variable(tf.truncated_normal([1320, self.num_classes],stddev=0.1), name='weight_line_2')
+            w2 = tf.Variable(tf.truncated_normal([temp_num, self.num_classes],stddev=0.1), name='weight_line_2')
             b2 = tf.Variable(tf.constant(0.1, shape=[self.num_classes]), name='bias_liner_2')
             liner_out2=tf.matmul(liner_out,w2)+b2
 
