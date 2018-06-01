@@ -19,7 +19,7 @@ class TextCNN(object):
         # self.decay_steps = 2500
         # self.decay_rate = 0.65
         self.learning_rate = tf.Variable(1e-3, trainable=False, name="learning_rate")  # ADD learning_rate
-        self.mode2_learning_rate = 1e-3
+        self.mode2_learning_rate = 1e-4
 
         self.num_checkpoints=100       #打印的频率
         self.dropout=1.0               #dropout比例
@@ -109,19 +109,21 @@ class TextCNN(object):
         # with tf.name_scope("dropout"):
         #     h_drop = tf.nn.dropout(h_pool_flat, self.dropout_keep_prob)
         with tf.name_scope("liner"):
-            if self.vocab_size!=0:
-                temp_num=(num_filters_total+self.num_classes)//2
+            if self.num_classes>3000:
+                w2 = tf.Variable(tf.truncated_normal([num_filters_total, self.num_classes], stddev=0.1),
+                                 name='weight_line_2')
+                b2 = tf.Variable(tf.constant(0.1, shape=[self.num_classes]), name='bias_liner_2')
+                liner_out2 = tf.matmul(h_pool_flat, w2) + b2
             else:
-                temp_num=1000
-            w1 = tf.Variable(tf.truncated_normal([num_filters_total, temp_num],stddev=0.1), name='weight_line_1')
-            b1 = tf.Variable(tf.constant(0.1, shape=[temp_num]), name='bias_liner_1')
-            liner_out=tf.matmul(h_pool_flat,w1)+b1
-            liner_out=self.batch_norm(liner_out,self.is_train,name='bn_liner_1')
-            liner_out=tf.nn.relu(liner_out)
+                w1 = tf.Variable(tf.truncated_normal([num_filters_total, (num_filters_total+self.num_classes)//2],stddev=0.1), name='weight_line_1')
+                b1 = tf.Variable(tf.constant(0.1, shape=[temp_num]), name='bias_liner_1')
+                liner_out=tf.matmul(h_pool_flat,w1)+b1
+                liner_out=self.batch_norm(liner_out,self.is_train,name='bn_liner_1')
+                liner_out=tf.nn.relu(liner_out)
 
-            w2 = tf.Variable(tf.truncated_normal([temp_num, self.num_classes],stddev=0.1), name='weight_line_2')
-            b2 = tf.Variable(tf.constant(0.1, shape=[self.num_classes]), name='bias_liner_2')
-            liner_out2=tf.matmul(liner_out,w2)+b2
+                w2 = tf.Variable(tf.truncated_normal([temp_num, self.num_classes],stddev=0.1), name='weight_line_2')
+                b2 = tf.Variable(tf.constant(0.1, shape=[self.num_classes]), name='bias_liner_2')
+                liner_out2=tf.matmul(liner_out,w2)+b2
 
         # Final (unnormalized) scores and predictions
         with tf.name_scope("output"):
@@ -167,7 +169,7 @@ class TextCNN(object):
 
         self.train_op_array=[]
         for i in range(10):
-            self.train_op_array.append(train_adamop_array[i].apply_gradients(zip(grads1,var_expect_embedding)))
+            self.train_op_array.append(train_adamop_array[i].apply_gradients(zip(grads1,var_expect_embedding),global_step=self.global_step))
         if self.vocab_size!=0:
             self.train_embedding_op=train_embedding_adamop.apply_gradients(zip(grads2,var_embedding))
 
@@ -271,7 +273,7 @@ class TextCNN(object):
             batches = self.data.train_batch_iter(self.batch_size, num_epoch)  # batch迭代器
 
             for x_batch, y_batch, batchnum, batchmax in batches:  # 通过迭代器取出batch数据
-                self.sess.graph.finalize()
+                # self.sess.graph.finalize()
 
                 feed_dict = {self.input_x: x_batch, self.input_y: y_batch, self.dropout_keep_prob: self.dropout,
                              self.is_train: True}
@@ -285,9 +287,9 @@ class TextCNN(object):
 
                 if (batchnum % self.num_checkpoints == 0):
                     print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-                    print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, num_epoch, batchnum, batchmax))
+                    print('epoch:%d/%d\tbatch:%d/%d\tloss:%f' % (epochnum, num_epoch, batchnum, batchmax,loss))
 
-                if batchnum%12000==0 or (epochnum == num_epoch-1 and batchnum == batchmax // 2):
+                if batchnum%36000==0 or (epochnum == num_epoch-1 and batchnum == batchmax // 2):
                     p, r, f1 = self.testModel()
                     if f1 > f1_max:
                         f1_max = f1
@@ -329,7 +331,7 @@ class TextCNN(object):
 
         for x,y in dev_iter:
             feed_dict = {self.input_x: x, self.input_y: y, self.dropout_keep_prob: 1.0,self.is_train:False}
-            summaries, loss, out ,step= self.sess.run([self.dev_summary_op, self.loss, self.out,self.global_step],feed_dict=feed_dict)
+            summaries, out ,step= self.sess.run([self.dev_summary_op, self.out,self.global_step],feed_dict=feed_dict)
 
             for i in range(len(out)):
                 self.data.evalution(out[i],y[i])
@@ -364,9 +366,9 @@ class TextCNN(object):
 
 def main():
     cnn=TextCNN(mode=1)
-    cnn.trainModel()
-    # cnn.loadModel()
-    # cnn.testModel()
+    # cnn.trainModel()
+    cnn.loadModel()
+    cnn.testModel()
 
 if __name__ == '__main__':
     main()

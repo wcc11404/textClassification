@@ -63,10 +63,13 @@ class dataset(object):
                 yield X,Y,k+i*tempnum+1,tempnum*(self.max_file_num+1)
 
     def dev_batch_iter(self,batch_size=50):
+        self.init_evalution()
         with open(self.train_data_x_dir + '%d' % self.max_train_file_num, 'rb') as f:
             temp_data_x=pickle.load(f)
         with open(self.train_data_y_dir + '%d' % self.max_train_file_num, 'rb') as f:
-            temp_data_y=pickle.load(f)
+            self.temp_data_y=pickle.load(f)
+
+        self.index=0    #bioasq数据集测试专用
 
         train_num=len(temp_data_x)
         tempnum=(train_num-1)//batch_size+1
@@ -78,10 +81,12 @@ class dataset(object):
             for j in range(min_num,max_num):
                 # x = self.process_X(temp_data_x[j])
                 x=temp_data_x[j]
-                y = self.process_Y(temp_data_y[j])
+                y = self.process_Y(self.temp_data_y[j])
                 X.append(x)
                 Y.append(y)
             yield X,Y
+
+        del self.temp_data_y
 
     def init_evalution(self):
         self.fenzi = 0.0
@@ -97,7 +102,9 @@ class dataset(object):
 
     def evalution(self,logits, label):      #计算微平均
         label_list = self.get_label_using_logits(logits)
-        eval_y_short = self.get_target_label_short(label)
+        # eval_y_short = self.get_target_label_short(label)
+        eval_y_short=self.temp_data_y[self.index]
+        self.index+=1
         num_correct_label = 0
 
         for i,label_predict in enumerate(label_list):
@@ -129,18 +136,21 @@ def main():
     data = dataset()
 
     # starttime = datetime.datetime.now()
-    #
-    # iter=data.train_batch_iter(100)
-    # for x,y,a,b in iter:
-    #     if a%100==0:
-    #         print("%d/%d" %(a,b))
-    #
+
+    iter=data.train_batch_iter(1)
+    for x,y,a,b in iter:
+        print(x[0])
+        print(y[0])
+        print(len(x[0]))
+        print(len(y[0]))
+        a=np.array(y[0])
+        print(np.where(a==1.))
+        if a%1==0:
+            break
+
     # endtime = datetime.datetime.now()
     # print((endtime - starttime).seconds)
-    x=[0.6,0.7,0.8,0.9]
-    y=[1,1,1,1]
-    data.evalution(x,y)
-    print(data.get_evalution_result())
+
 
 if __name__ == '__main__':
     main()

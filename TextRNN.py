@@ -36,9 +36,12 @@ class TextRNN(object):
 
         # Embedding layer
         init_value=tf.truncated_normal_initializer(stddev=0.1)
-        with tf.name_scope("embedding"):
-            W = tf.Variable(self.data.load_vocabulary(),name="embedding_w")
-            embedded_chars = tf.nn.embedding_lookup(W, self.input_x)                                        #通过input_x查找对应字典的随机数
+        if self.vocab_size!=0:
+            with tf.name_scope("embedding"):
+                W = tf.Variable(self.data.load_vocabulary(),name="embedding_w")
+                embedded_chars = tf.nn.embedding_lookup(W, self.input_x)                                        #通过input_x查找对应字典的随机数
+        else:
+            embedded_chars=self.input_x
 
         with tf.name_scope("RNN"):
             lstm_fw_cell = tf.contrib.rnn.BasicLSTMCell(self.hidden_size) # forward direction cell
@@ -103,8 +106,10 @@ class TextRNN(object):
 
         self.train_op_array = []
         for i in range(10):
-            self.train_op_array.append(train_adamop_array[i].apply_gradients(zip(grads1, var_expect_embedding)))
-        self.train_embedding_op = train_embedding_adamop.apply_gradients(zip(grads2, var_embedding))
+            self.train_op_array.append(
+                train_adamop_array[i].apply_gradients(zip(grads1, var_expect_embedding), global_step=self.global_step))
+        if self.vocab_size != 0:
+            self.train_embedding_op = train_embedding_adamop.apply_gradients(zip(grads2, var_embedding))
 
         self.buildSummaries()
 
