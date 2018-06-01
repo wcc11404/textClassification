@@ -115,7 +115,8 @@ class TextCNN(object):
                 b2 = tf.Variable(tf.constant(0.1, shape=[self.num_classes]), name='bias_liner_2')
                 liner_out2 = tf.matmul(h_pool_flat, w2) + b2
             else:
-                w1 = tf.Variable(tf.truncated_normal([num_filters_total, (num_filters_total+self.num_classes)//2],stddev=0.1), name='weight_line_1')
+                temp_num=(num_filters_total+self.num_classes)//2
+                w1 = tf.Variable(tf.truncated_normal([num_filters_total, temp_num],stddev=0.1), name='weight_line_1')
                 b1 = tf.Variable(tf.constant(0.1, shape=[temp_num]), name='bias_liner_1')
                 liner_out=tf.matmul(h_pool_flat,w1)+b1
                 liner_out=self.batch_norm(liner_out,self.is_train,name='bn_liner_1')
@@ -366,9 +367,9 @@ class TextCNN(object):
 
 def main():
     cnn=TextCNN(mode=1)
-    # cnn.trainModel()
-    cnn.loadModel()
-    cnn.testModel()
+    cnn.trainModel()
+    # cnn.loadModel()
+    # cnn.testModel()
 
 if __name__ == '__main__':
     main()

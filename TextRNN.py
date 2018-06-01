@@ -30,7 +30,10 @@ class TextRNN(object):
         self.buildModel()
 
     def buildModel(self):
-        self.input_x = tf.placeholder(tf.int32, [None, self.sequence_length], name="input_x")
+        if self.vocab_size!=0:
+            self.input_x = tf.placeholder(tf.int32, [None, self.sequence_length], name="input_x")
+        else :
+            self.input_x = tf.placeholder(tf.float32, [None, self.sequence_length,self.embedding_size], name="input_x")
         self.input_y = tf.placeholder(tf.float32, [None, self.num_classes], name="input_y")
         self.dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
 
