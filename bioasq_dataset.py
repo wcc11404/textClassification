@@ -63,7 +63,6 @@ class dataset(object):
                 yield X,Y,k+i*tempnum+1,tempnum*(self.max_file_num+1)
 
     def dev_batch_iter(self,batch_size=50):
-        self.init_evalution()
         with open(self.train_data_x_dir + '%d' % self.max_train_file_num, 'rb') as f:
             temp_data_x=pickle.load(f)
         with open(self.train_data_y_dir + '%d' % self.max_train_file_num, 'rb') as f:

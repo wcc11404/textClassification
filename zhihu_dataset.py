@@ -134,7 +134,6 @@ class dataset(object):
         f.close()
 
     def dev_batch_iter(self,batch_size=64):
-        self.init_evalution()
         if self.mode==1:
             f = open(self.data_dir + 'question_temp_test.txt', 'r', errors='ignore')
             for k in range((self.test_num-1)//batch_size+1):
