@@ -65,27 +65,75 @@ class Inception(object):
             conv=tf.nn.conv2d(input,w,strides,padding)
             return conv
 
-    def inceptionA(self,input):
+    def reduction(self,input,scope="reduction"):
+        shape_in = int(input.shape[3])
+        with tf.variable_scope(scope):
+            branch_1 = self.convolution_batchnormalization(input, [3, 3, shape_in, shape_in], 'conv', [1, 2, 2, 1])
+            branch_2 = tf.nn.max_pool(input, [1, 3, 3, 1], [1, 2, 2, 1], "SAME", name='max_pool')
+            out=tf.concat([branch_1,branch_2],3)
+        return out
+
+    def inceptionA(self,input,output_size=-1,output_proportion=[64,128,32,32],max_size=3,scope='inceptionA'):#[2,4,1,1]
+        if len(output_proportion)!=4:
+            print('error')
+            return None
         shape_in=int(input.shape[3])
-        shape_out_1=shape_in//4
-        shape_out_2=shape_in//6
-        with tf.variable_scope('inceptionA'):
-            conv1=self.convolution(input,[1,1,shape_in,shape_out_1],'conv1')
+        if output_size==-1:
+            output_size=shape_in
+        sum=0
+        for i in output_proportion:
+            sum+=i
+        shape_out_1 = output_size * (output_proportion[0] / sum)
+        shape_out_2 = output_size * (output_proportion[1] / sum)
+        shape_out_3 = output_size * (output_proportion[2] / sum)
+        shape_out_4 = output_size - shape_out_1 - shape_out_2 - shape_out_3
+        with tf.variable_scope(scope):
+            branch_1=self.convolution_batchnormalization(input,[1,1,shape_in,shape_out_1],'conv1')
 
-            conv2=tf.nn.avg_pool(input,[1,3,3,1],[1,1,1,1],"SAME",name='avg_pool')
-            conv2=self.convolution(conv2,[1,1,shape_in,shape_out_1],'conv2')
+            branch_2 = self.convolution_batchnormalization(input, [1, 1, shape_in, shape_out_2//2], 'conv2_1')
+            branch_2 = self.convolution_batchnormalization(branch_2, [max_size, max_size, shape_out_2//2, shape_out_2], 'conv2_2')
 
-            conv3 = self.convolution(input, [1, 1, shape_in, shape_out_2], 'conv3_1')
-            conv3 = self.convolution(conv3, [3, 3, shape_out_2, shape_out_1], 'conv3_2')
+            branch_3 = self.convolution_batchnormalization(input, [1, 1, shape_in, shape_out_3//2], 'conv3_1')
+            branch_3 = self.convolution_batchnormalization(branch_3, [max_size, max_size, shape_out_3//2, shape_out_3//2], 'conv3_2')
+            branch_3 = self.convolution_batchnormalization(branch_3, [max_size, max_size, shape_out_3//2, shape_out_3], 'conv3_3')
 
-            conv4 = self.convolution(input, [1, 1, shape_in, shape_out_2], 'conv4_1')
-            conv4 = self.convolution(conv4, [3, 3, shape_out_2, shape_out_1], 'conv4_2')
-            conv4 = self.convolution(conv4, [3, 3, shape_out_1, shape_out_1], 'conv4_3')
+            branch_4 = tf.nn.avg_pool(input, [1, 3, 3, 1], [1, 1, 1, 1], "SAME", name='avg_pool')
+            branch_4 = self.convolution_batchnormalization(branch_4, [1, 1, shape_in, shape_out_4], 'conv4')
 
-            concat=tf.concat([conv1,conv2,conv3,conv4],3)
-            bn=self.batch_norm(concat,self.is_train,name='bn')
-            b=tf.get_variable('bias',[shape_in],initializer=tf.constant_initializer(0.1))
-            out=tf.nn.relu(bn+b)
+            out=tf.concat([branch_1,branch_2,branch_3,branch_4],3)
+        return out
+
+    def inceptionB(self,input,output_size=-1,output_proportion=[64,128,32,32],max_size=3,scope='inceptionB'):#[2,4,1,1]
+        if len(output_proportion)!=4:
+            print('error')
+            return None
+        shape_in=int(input.shape[3])
+        if output_size==-1:
+            output_size=shape_in
+        sum=0
+        for i in output_proportion:
+            sum+=i
+        shape_out_1 = output_size * (output_proportion[0] / sum)
+        shape_out_2 = output_size * (output_proportion[1] / sum)
+        shape_out_3 = output_size * (output_proportion[2] / sum)
+        shape_out_4 = output_size - shape_out_1 - shape_out_2 - shape_out_3
+        with tf.variable_scope(scope):
+            branch_1=self.convolution_batchnormalization(input,[1,1,shape_in,shape_out_1],'conv1')
+
+            branch_2 = self.convolution_batchnormalization(input, [1, 1, shape_in, shape_out_2//2], 'conv2_1')
+            branch_2 = self.convolution_batchnormalization(branch_2, [1, max_size, shape_out_2 // 2, shape_out_2//2], 'conv2_2')
+            branch_2 = self.convolution_batchnormalization(branch_2, [max_size, 1, shape_out_2, shape_out_2], 'conv2_3')
+
+            branch_3 = self.convolution_batchnormalization(input, [1, 1, shape_in, shape_out_3//2], 'conv3_1')
+            branch_3 = self.convolution_batchnormalization(branch_3, [1, max_size, shape_out_3//2, shape_out_3//2], 'conv3_2')
+            branch_3 = self.convolution_batchnormalization(branch_3, [max_size, 1, shape_out_3 // 2, shape_out_3], 'conv3_3')
+            branch_3 = self.convolution_batchnormalization(branch_3, [1, max_size, shape_out_3, shape_out_3], 'conv3_4')
+            branch_3 = self.convolution_batchnormalization(branch_3, [max_size, 1, shape_out_3, shape_out_3], 'conv3_5')
+
+            branch_4 = tf.nn.avg_pool(input, [1, 3, 3, 1], [1, 1, 1, 1], "SAME", name='avg_pool')
+            branch_4 = self.convolution_batchnormalization(branch_4, [1, 1, shape_in, shape_out_4], 'conv4')
+
+            out=tf.concat([branch_1,branch_2,branch_3,branch_4],3)
         return out
 
     def buildModel(self):
@@ -107,27 +155,25 @@ class Inception(object):
 
         embedded_chars_expanded = tf.expand_dims(embedded_chars, -1)#将[none,56,128]后边加一维，变成[none,56,128,1]
 
-        conv = self.convolution_batchnormalization(embedded_chars_expanded, [3, 3, 1, 64], 'conv111',
-                                                   strides=[1, 2, 2, 1])
-        conv = self.convolution_batchnormalization(conv, [3, 3, 64, 128], 'conv222',
-                                                   strides=[1, 2, 2, 1])
-        conv = self.convolution_batchnormalization(conv, [3, 3, 128, 256], 'conv333',
-                                                   strides=[1, 2, 2, 1])
+        conv = self.convolution_batchnormalization(embedded_chars_expanded, [3, 3, 1, 64], 'conv111',strides=[1, 2, 2, 1])
+        conv = self.reduction(conv, 'reduction1')
+        conv = self.reduction(conv, 'reduction2')
+        print(conv)
+        # conv = self.convolution_batchnormalization(conv, [3, 3, 64, 128], 'conv222',
+        #                                            strides=[1, 2, 2, 1])
+        # conv = self.convolution_batchnormalization(conv, [3, 3, 128, 256], 'conv333',
+        #                                            strides=[1, 2, 2, 1])
         out=self.inceptionA(conv)
-        out=tf.nn.max_pool(out,ksize=[1, int(out.shape[1]), 1, 1],strides=[1, 1, 1, 1],padding='VALID',name="pool")
+        out=tf.nn.max_pool(out,ksize=[1, 1, 1, int(out.shape[3])],strides=[1, 1, 1, 1],padding='VALID',name="pool")
+        print(out)
         temp=int(out.shape[1])*int(out.shape[2])*int(out.shape[3])
         out=tf.reshape(out,[-1,temp])
+        print(out)
 
         with tf.name_scope("liner"):
-            w1 = tf.Variable(tf.truncated_normal([temp, 200], stddev=0.1), name='weight_line_1')
-            b1 = tf.Variable(tf.constant(0.1, shape=[200]), name='bias_liner_1')
-            liner_out = tf.matmul(out, w1) + b1
-            liner_out = self.batch_norm(liner_out, self.is_train, name='bn_liner_1')
-            liner_out = tf.nn.relu(liner_out)
-
-            w2 = tf.Variable(tf.truncated_normal([200, self.num_classes], stddev=0.1), name='weight_line_2')
+            w2 = tf.Variable(tf.truncated_normal([temp, self.num_classes], stddev=0.1),name='weight_line_2')
             b2 = tf.Variable(tf.constant(0.1, shape=[self.num_classes]), name='bias_liner_2')
-            liner_out2 = tf.matmul(liner_out, w2) + b2
+            liner_out2 = tf.matmul(out, w2) + b2
 
         # Final (unnormalized) scores and predictions
         with tf.name_scope("output"):
