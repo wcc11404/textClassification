@@ -315,7 +315,7 @@ class Inception(object):
         self.write_log_infomation("start time : " + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), True)
 
         for epochnum in range(self.num_epochs):
-            batches = self.data.train_batch_iter(self.batch_size, self.num_epochs)  # batch迭代器
+            batches = self.data.train_batch_iter(self.batch_size)  # batch迭代器
 
             for x_batch, y_batch, batchnum, batchmax in batches:  # 通过迭代器取出batch数据
                 self.sess.graph.finalize()
