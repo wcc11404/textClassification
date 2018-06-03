@@ -263,7 +263,7 @@ class Inception(object):
         # if self.mode==1:
         #     self.trainModel1(num_epoch)
         # elif self.mode==2:
-        self.trainModel2(num_epoch)
+        self.trainModel2()
 
     def trainModel1(self):
 
