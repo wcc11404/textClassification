@@ -265,7 +265,7 @@ class Inception(object):
         # elif self.mode==2:
         self.trainModel2(num_epoch)
 
-    def trainModel1(self,num_epoch=10):
+    def trainModel1(self):
 
         train_op_chioce=self.train_op
         f1_max=0.0
@@ -305,7 +305,7 @@ class Inception(object):
             print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             print('epoch %d finish' % (epochnum+1))
 
-    def trainModel2(self,num_epoch=10):
+    def trainModel2(self):
         train_num = 0
         train_op_chioce = self.train_op_array[train_num]
         f1_max = 0.0
@@ -314,8 +314,8 @@ class Inception(object):
         self.starttime = datetime.datetime.now()
         self.write_log_infomation("start time : " + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), True)
 
-        for epochnum in range(num_epoch):
-            batches = self.data.train_batch_iter(self.batch_size, num_epoch)  # batch迭代器
+        for epochnum in range(self.num_epochs):
+            batches = self.data.train_batch_iter(self.batch_size, self.num_epochs)  # batch迭代器
 
             for x_batch, y_batch, batchnum, batchmax in batches:  # 通过迭代器取出batch数据
                 self.sess.graph.finalize()
@@ -332,9 +332,9 @@ class Inception(object):
 
                 if (batchnum % self.num_checkpoints == 0):
                     print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-                    print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, num_epoch, batchnum, batchmax))
+                    print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, self.num_epochs, batchnum, batchmax))
 
-                if (epochnum == num_epoch-1 and batchnum == batchmax // 2):
+                if (epochnum == self.num_epochs-1 and batchnum == batchmax // 2):
                     p, r, f1 = self.testModel()
                     if f1 > f1_max:
                         f1_max = f1
