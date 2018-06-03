@@ -106,19 +106,11 @@ class dataset(object):
     #         x,y=zip(*shuffled_data[start_index:end_index])
     #         yield x,y,epoch,num_epochs,i,self.textfilenum,batch_num,num_batches_per_epoch
 
-    def train_batch_iter(self, batch_size, num_epochs,load=False,load_batch_num=0):
-        # for epoch in range(num_epochs):
+    def train_batch_iter(self, batch_size):
         f = open(self.data_dir + 'question_temp.txt', 'r', errors='ignore')
-        min_num=0
-
-        if load:
-            load=False
-            min_num=load_batch_num+1
-            for i in range(min_num*batch_size):
-                line=f.readline()
 
         tempnum=(self.train_num-1)//batch_size+1
-        for k in range(min_num,tempnum):
+        for k in range(tempnum):
             X = []
             Y = []
             for j in range(batch_size):

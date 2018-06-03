@@ -25,6 +25,7 @@ class Inception(object):
         self.batch_size=100
         self.Model_dir = "Inception"  # 模型参数默认保存位置
         self.is_train= tf.placeholder(tf.bool)
+        self.num_epochs=15
 
         self.buildModel()
 
@@ -155,9 +156,10 @@ class Inception(object):
 
         embedded_chars_expanded = tf.expand_dims(embedded_chars, -1)#将[none,56,128]后边加一维，变成[none,56,128,1]
 
-        conv = self.convolution_batchnormalization(embedded_chars_expanded, [3, 3, 1, 64], 'conv111',strides=[1, 2, 2, 1])
+        conv = self.convolution_batchnormalization(embedded_chars_expanded, [3, 3, 1, 32], 'conv111',strides=[1, 2, 2, 1])
         conv = self.reduction(conv, 'reduction1')
         conv = self.reduction(conv, 'reduction2')
+        conv = self.reduction(conv, 'reduction3')
         out=self.inceptionA(conv)
         out=tf.nn.max_pool(out,ksize=[1, int(out.shape[1]), 1, 1],strides=[1, 1, 1, 1],padding='VALID',name="pool")
         temp=int(out.shape[1])*int(out.shape[2])*int(out.shape[3])
@@ -200,7 +202,7 @@ class Inception(object):
         var_expect_embedding = [v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
         train_adamop_array=[]
         learning_rate_temp=1e-3
-        for i in range(10):
+        for i in range(self.num_epochs):
             train_adamop_array.append(tf.train.AdamOptimizer(learning_rate_temp))#.minimize(self.loss,global_step=self.global_step,var_list=var_expect_embedding))
             learning_rate_temp/=2.0
         var_embedding=[v for v in tf.trainable_variables() if 'embedding_w' in v.name]
@@ -211,7 +213,7 @@ class Inception(object):
         grads2=grads[len(var_expect_embedding):]
 
         self.train_op_array=[]
-        for i in range(10):
+        for i in range(self.num_epochs):
             self.train_op_array.append(train_adamop_array[i].apply_gradients(zip(grads1, var_expect_embedding), global_step=self.global_step))
         if self.vocab_size != 0:
             self.train_embedding_op = train_embedding_adamop.apply_gradients(zip(grads2, var_embedding))
@@ -271,8 +273,8 @@ class Inception(object):
         print("start training")
         self.starttime = datetime.datetime.now()
 
-        for epochnum in range(num_epoch):
-            batches = self.data.train_batch_iter(self.batch_size, num_epoch)  # batch迭代器
+        for epochnum in range(self.num_epochs):
+            batches = self.data.train_batch_iter(self.batch_size)  # batch迭代器
 
             if epochnum>0:
                 train_op_chioce=self.train_op1
@@ -285,7 +287,7 @@ class Inception(object):
 
                 if ((step - 1) % self.num_checkpoints == 0):
                     print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-                    print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, num_epoch, batchnum, batchmax))
+                    print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, self.num_epochs, batchnum, batchmax))
 
                 if ((step - 1) and (step - 1) % self.num_test == 0):
                     p,r,f1=self.testModel()
