@@ -158,17 +158,10 @@ class Inception(object):
         conv = self.convolution_batchnormalization(embedded_chars_expanded, [3, 3, 1, 64], 'conv111',strides=[1, 2, 2, 1])
         conv = self.reduction(conv, 'reduction1')
         conv = self.reduction(conv, 'reduction2')
-        print(conv)
-        # conv = self.convolution_batchnormalization(conv, [3, 3, 64, 128], 'conv222',
-        #                                            strides=[1, 2, 2, 1])
-        # conv = self.convolution_batchnormalization(conv, [3, 3, 128, 256], 'conv333',
-        #                                            strides=[1, 2, 2, 1])
         out=self.inceptionA(conv)
-        out=tf.nn.max_pool(out,ksize=[1, 1, 1, int(out.shape[3])],strides=[1, 1, 1, 1],padding='VALID',name="pool")
-        print(out)
+        out=tf.nn.max_pool(out,ksize=[1, int(out.shape[1]), 1, 1],strides=[1, 1, 1, 1],padding='VALID',name="pool")
         temp=int(out.shape[1])*int(out.shape[2])*int(out.shape[3])
         out=tf.reshape(out,[-1,temp])
-        print(out)
 
         with tf.name_scope("liner"):
             w2 = tf.Variable(tf.truncated_normal([temp, self.num_classes], stddev=0.1),name='weight_line_2')
