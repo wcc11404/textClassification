@@ -14,18 +14,21 @@ class TextRNN(object):
 
         self.sequence_length,self.num_classes,self.vocab_size,self.embedding_size=self.data.get_param()
 
-        self.hidden_size=self.embedding_size
-        self.is_train = tf.placeholder(tf.bool) #batchnormalization用
-
         # self.decay_steps = 3000
         # self.decay_rate = 0.5  # 62
+        #self.learning_rate = tf.Variable(1e-2, trainable=False, name="learning_rate")  # ADD learning_rate
+
         self.l2_reg_lambda = 0.0001     #l2范数的学习率
         self.num_checkpoints = 100  # 打印的频率
         self.dropout=1.0               #dropout比例
-        self.learning_rate = tf.Variable(1e-2, trainable=False, name="learning_rate")  # ADD learning_rate
-        self.mode2_learning_rate = 1e-2
+        self.mode_learning_rate = 1e-2
+        self.embed_learning_rate = 2e-4
         self.batch_size=64
+        self.num_epochs = 10            #总的训练次数
         self.Model_dir = "TextRNN"  # 模型参数默认保存位置
+
+        self.hidden_size = self.embedding_size
+        self.is_train = tf.placeholder(tf.bool)  # batchnormalization用
 
         self.buildModel()
 
@@ -95,20 +98,20 @@ class TextRNN(object):
         # elif self.mode==2:
         var_expect_embedding = [v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
         train_adamop_array = []
-        learning_rate_temp = self.mode2_learning_rate
-        for i in range(10):
+        learning_rate_temp = self.mode_learning_rate
+        for i in range(self.num_epochs):
             train_adamop_array.append(tf.train.AdamOptimizer(
                 learning_rate_temp))  # .minimize(self.loss,global_step=self.global_step,var_list=var_expect_embedding))
             learning_rate_temp /= 2.0
         var_embedding = [v for v in tf.trainable_variables() if 'embedding_w' in v.name]
-        train_embedding_adamop = tf.train.AdamOptimizer(2e-4)  # .minimize(self.loss,var_list=var_embedding)
+        train_embedding_adamop = tf.train.AdamOptimizer(self.embed_learning_rate)  # .minimize(self.loss,var_list=var_embedding)
 
         grads = tf.gradients(self.loss, var_expect_embedding + var_embedding)
         grads1 = grads[:len(var_expect_embedding)]
         grads2 = grads[len(var_expect_embedding):]
 
         self.train_op_array = []
-        for i in range(10):
+        for i in range(self.num_epochs):
             self.train_op_array.append(
                 train_adamop_array[i].apply_gradients(zip(grads1, var_expect_embedding), global_step=self.global_step))
         if self.vocab_size != 0:
@@ -159,7 +162,7 @@ class TextRNN(object):
         # if self.mode==1:
         #     self.trainModel1(num_epoch)
         # elif self.mode==2:
-        self.trainModel2(num_epoch)
+        self.trainModel2()
 
     def trainModel1(self,num_epoch=10):
         train_op_chioce=self.train_op
@@ -200,7 +203,7 @@ class TextRNN(object):
             print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             print('epoch %d finish' % (epochnum+1))
 
-    def trainModel2(self,num_epoch=10):
+    def trainModel2(self):
         train_num = 0
         train_op_chioce = self.train_op_array[train_num]
         f1_max = 0.0
@@ -209,8 +212,8 @@ class TextRNN(object):
         self.starttime = datetime.datetime.now()
         self.write_log_infomation("start time : " + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), True)
 
-        for epochnum in range(num_epoch):
-            batches = self.data.train_batch_iter(self.batch_size, num_epoch)  # batch迭代器
+        for epochnum in range(self.num_epochs):
+            batches = self.data.train_batch_iter(self.batch_size)  # batch迭代器
 
             for x_batch, y_batch, batchnum, batchmax in batches:  # 通过迭代器取出batch数据
                 self.sess.graph.finalize()
@@ -227,9 +230,9 @@ class TextRNN(object):
 
                 if (batchnum % self.num_checkpoints == 0):
                     print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-                    print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, num_epoch, batchnum, batchmax))
+                    print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, self.num_epochs, batchnum, batchmax))
 
-                if (epochnum == num_epoch-1 and batchnum == batchmax // 2):
+                if (epochnum == self.num_epochs-1 and batchnum == batchmax // 2):
                     p, r, f1 = self.testModel()
                     if f1 > f1_max:
                         f1_max = f1

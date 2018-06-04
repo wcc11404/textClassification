@@ -39,7 +39,7 @@ class dataset(object):
             result[i] = 1
         return result
 
-    def train_batch_iter(self, batch_size, num_epochs=0):
+    def train_batch_iter(self, batch_size):
         # for epoch in range(num_epochs):
         for i in range(self.max_train_file_num+1):
             with open(self.train_data_x_dir + '%d' % i, 'rb') as f:

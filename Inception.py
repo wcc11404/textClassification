@@ -13,19 +13,22 @@ class Inception(object):
 
         self.sequence_length,self.num_classes,self.vocab_size,self.embedding_size=self.data.get_param()
 
-        if self.mode==1:
-            self.decay_steps = 2500
-            self.decay_rate = 0.65
-            self.learning_rate = tf.Variable(1e-3, trainable=False, name="learning_rate")  # ADD learning_rate
-            self.num_test = 2500
+        # if self.mode==1:
+        #     self.decay_steps = 2500
+        #     self.decay_rate = 0.65
+        #     self.learning_rate = tf.Variable(1e-3, trainable=False, name="learning_rate")  # ADD learning_rate
+        #     self.num_test = 2500
 
+        self.mode_learning_rate=1e-3
+        self.embed_learning_rate = 2e-4
         self.num_checkpoints = 100      # 打印的频率
         self.l2_reg_lambda = 0.0001     #l2范数的学习率
         self.dropout=0.5               #dropout比例
         self.batch_size=100
+        self.num_epochs = 15
         self.Model_dir = "Inception"  # 模型参数默认保存位置
+
         self.is_train= tf.placeholder(tf.bool)
-        self.num_epochs=15
 
         self.buildModel()
 
@@ -201,12 +204,12 @@ class Inception(object):
         # elif self.mode==2:
         var_expect_embedding = [v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
         train_adamop_array=[]
-        learning_rate_temp=1e-3
+        learning_rate_temp=self.mode_learning_rate
         for i in range(self.num_epochs):
             train_adamop_array.append(tf.train.AdamOptimizer(learning_rate_temp))#.minimize(self.loss,global_step=self.global_step,var_list=var_expect_embedding))
             learning_rate_temp/=2.0
         var_embedding=[v for v in tf.trainable_variables() if 'embedding_w' in v.name]
-        train_embedding_adamop=tf.train.AdamOptimizer(2e-4)#.minimize(self.loss,var_list=var_embedding)
+        train_embedding_adamop=tf.train.AdamOptimizer(self.embed_learning_rate)#.minimize(self.loss,var_list=var_embedding)
 
         grads=tf.gradients(self.loss,var_expect_embedding+var_embedding)
         grads1=grads[:len(var_expect_embedding)]
