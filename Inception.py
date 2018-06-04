@@ -363,7 +363,7 @@ class Inception(object):
             self.write_log_infomation(str)
             train_num += 1
 
-            if train_num < 10:
+            if train_num < self.num_epochs:
                 train_op_chioce = self.train_op_array[train_num]
             else:
                 break
