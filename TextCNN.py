@@ -21,12 +21,12 @@ class TextCNN(object):
         #self.learning_rate = tf.Variable(1e-3, trainable=False, name="learning_rate")  # ADD learning_rate
 
         self.l2_reg_lambda = 0.0001  # l2范数的学习率
-        self.mode_learning_rate = 1e-3
+        self.mode_learning_rate = 1e-4
         self.embed_learning_rate = 2e-4
         self.num_checkpoints=100       #打印的频率
         self.dropout=1.0               #dropout比例
         self.batch_size=100
-        self.num_epochs = 15            #总的训练次数
+        self.num_epochs = 10            #总的训练次数
         self.Model_dir = "TextCNN"  # 模型参数默认保存位置
 
         self.is_train= tf.placeholder(tf.bool)
