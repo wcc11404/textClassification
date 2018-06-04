@@ -6,7 +6,7 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 class Inception(object):
-    def __init__(self, mode=1):
+    def __init__(self, mode=2):
         self.sess = tf.InteractiveSession()
         self.mode=mode
         self.data=dataset(self.mode)             #数据集
@@ -413,7 +413,7 @@ class Inception(object):
         f.close()
 
 def main():
-    inception=Inception(mode=2)
+    inception=Inception()
     inception.trainModel()
     # cnn.loadModel()
     # cnn.testModel()
