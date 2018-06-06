@@ -41,7 +41,7 @@ class dataset(object):
 
     def train_batch_iter(self, batch_size):
         # for epoch in range(num_epochs):
-        for i in range(self.max_train_file_num+1):
+        for i in range(10):#self.max_train_file_num+1
             with open(self.train_data_x_dir + '%d' % i, 'rb') as f:
                 temp_data_x=pickle.load(f)
             with open(self.train_data_y_dir + '%d' % i, 'rb') as f:

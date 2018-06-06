@@ -21,7 +21,7 @@ class TextCNN(object):
         #self.learning_rate = tf.Variable(1e-3, trainable=False, name="learning_rate")  # ADD learning_rate
 
         self.l2_reg_lambda = 0.0001  # l2范数的学习率
-        self.mode_learning_rate = 1e-3
+        self.mode_learning_rate = 4e-4
         self.embed_learning_rate = 2e-4
         self.num_checkpoints=100       #打印的频率
         self.dropout=0.5               #dropout比例
@@ -109,20 +109,20 @@ class TextCNN(object):
         h_pool_flat = tf.reshape(h_pool, [-1, num_filters_total])
 
         # Add dropout
-        with tf.name_scope("dropout"):
-            h_drop = tf.nn.dropout(h_pool_flat, self.dropout_keep_prob)
+        # with tf.name_scope("dropout"):
+        #     h_drop = tf.nn.dropout(h_pool_flat, self.dropout_keep_prob)
 
         with tf.name_scope("liner"):
             if self.num_classes>3000:
                 w2 = tf.Variable(tf.truncated_normal([num_filters_total, self.num_classes], stddev=0.1),
                                  name='weight_line_2')
                 b2 = tf.Variable(tf.constant(0.1, shape=[self.num_classes]), name='bias_liner_2')
-                liner_out2 = tf.matmul(h_drop, w2) + b2
+                liner_out2 = tf.matmul(h_pool_flat, w2) + b2
             else:
                 temp_num=(num_filters_total+self.num_classes)//2
                 w1 = tf.Variable(tf.truncated_normal([num_filters_total, temp_num],stddev=0.1), name='weight_line_1')
                 b1 = tf.Variable(tf.constant(0.1, shape=[temp_num]), name='bias_liner_1')
-                liner_out=tf.matmul(h_drop,w1)+b1
+                liner_out=tf.matmul(h_pool_flat,w1)+b1
                 liner_out=self.batch_norm(liner_out,self.is_train,name='bn_liner_1')
                 liner_out=tf.nn.relu(liner_out)
 
@@ -294,7 +294,7 @@ class TextCNN(object):
                     print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                     print('epoch:%d/%d\tbatch:%d/%d\tloss:%f' % (epochnum, self.num_epochs, batchnum, batchmax,loss))
 
-                if batchnum%12000==0 or (epochnum == self.num_epochs-1 and batchnum == batchmax // 2):
+                if batchnum%99999999==0 or (epochnum == self.num_epochs-1 and batchnum == batchmax // 2):
                     p, r, f1 = self.testModel()
                     if f1 > f1_max:
                         f1_max = f1
