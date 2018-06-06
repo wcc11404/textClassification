@@ -55,6 +55,15 @@ class TextCNN(object):
                 x = tf.nn.batch_normalization(x, mean, variance, None, None, eps)
             return x
 
+    def convolution_batchnormalization(self,input,shape,scope,strides=[1,1,1,1],padding="SAME",init=tf.truncated_normal_initializer(stddev=0.1)):
+        with tf.variable_scope(scope):
+            w=tf.get_variable("weight_conv",shape,tf.float32,init)
+            b=tf.get_variable("bias_conv",[shape[3]],tf.float32,tf.constant_initializer(0.1))
+            conv=tf.nn.conv2d(input,w,strides,padding)
+            conv=self.batch_norm(conv,self.is_train,name=scope)
+            conv=tf.nn.relu(tf.nn.bias_add(conv,b))
+            return conv
+
     def buildModel(self):
         if self.vocab_size!=0:
             self.input_x = tf.placeholder(tf.int32, [None, self.sequence_length], name="input_x")
@@ -80,27 +89,29 @@ class TextCNN(object):
             with tf.name_scope("conv-maxpool-%s" % filter_size):
 
                 # Convolution Layer1
-                filter_shape = [filter_size, self.embedding_size, 1, self.num_filters]
-                w = tf.Variable(tf.truncated_normal(filter_shape, stddev=0.1), name="w1_%d" % i)
-                b = tf.Variable(tf.constant(0.1, shape=[self.num_filters]), name="bias1_%d" % i)
-
-                conv = tf.nn.conv2d(embedded_chars_expanded, w, strides=[1, 1, 1, 1], padding="VALID")
-                conv = self.batch_norm(conv, self.is_train,name='bn1_%d' % i)
-
-                h = tf.nn.relu(tf.nn.bias_add(conv, b))
+                filter_shape = [filter_size, self.embedding_size, 1, self.num_filters//2]
+                conv1=self.convolution_batchnormalization(embedded_chars_expanded,filter_shape,'conv%d_1' % i,padding='VALID')
+                # w = tf.Variable(tf.truncated_normal(filter_shape, stddev=0.1), name="w1_%d" % i)
+                # b = tf.Variable(tf.constant(0.1, shape=[self.num_filters]), name="bias1_%d" % i)
+                #
+                # conv = tf.nn.conv2d(embedded_chars_expanded, w, strides=[1, 1, 1, 1], padding="VALID")
+                # conv = self.batch_norm(conv, self.is_train,name='bn1_%d' % i)
+                #
+                # h = tf.nn.relu(tf.nn.bias_add(conv, b))
 
                 # Convolution Layer2
-                filter_shape1 = [filter_size, 1, self.num_filters, self.num_filters]
-                w1 = tf.Variable(tf.truncated_normal(filter_shape1, stddev=0.1), name="w2_%d" % i)
-                b1 = tf.Variable(tf.constant(0.1, shape=[self.num_filters]), name="bias2_%d" % i)
-
-                conv = tf.nn.conv2d(h, w1, strides=[1, 1, 1, 1], padding="VALID")
-                conv = self.batch_norm(conv, self.is_train,name='bn2_%d' % i)
-
-                h1 = tf.nn.relu(tf.nn.bias_add(conv, b1))
+                filter_shape1 = [filter_size, 1, self.num_filters//2, self.num_filters]
+                conv2=self.convolution_batchnormalization(conv1,filter_shape1,'conv%d_2' %i,padding='VALID')
+                # w1 = tf.Variable(tf.truncated_normal(filter_shape1, stddev=0.1), name="w2_%d" % i)
+                # b1 = tf.Variable(tf.constant(0.1, shape=[self.num_filters]), name="bias2_%d" % i)
+                #
+                # conv = tf.nn.conv2d(h, w1, strides=[1, 1, 1, 1], padding="VALID")
+                # conv = self.batch_norm(conv, self.is_train,name='bn2_%d' % i)
+                #
+                # h1 = tf.nn.relu(tf.nn.bias_add(conv, b1))
 
                 # Maxpooling over the outputs
-                pooled = tf.nn.max_pool(h1,ksize=[1, self.sequence_length - 2*filter_size + 2, 1, 1],strides=[1, 1, 1, 1],padding='VALID',name="pool_%d" % i)
+                pooled = tf.nn.max_pool(conv2,ksize=[1, self.sequence_length - 2*filter_size + 2, 1, 1],strides=[1, 1, 1, 1],padding='VALID',name="pool_%d" % i)
                 pooled_outputs.append(pooled)
 
         # Combine all the pooled features
