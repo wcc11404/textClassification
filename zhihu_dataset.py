@@ -214,15 +214,14 @@ def main():
 
     starttime = datetime.datetime.now()
 
-    data=dataset(2)
+    data=dataset(1)
 
     i=0
-    iter=data.dev_batch_iter2()
-    for x,y in iter:
-        i+=1
+    iter=data.train_batch_iter(100)
+    for x,y,a,b in iter:
 
-        # if(i%1000==0):
-        #     print(i)
+        if(a%1000==0):
+            break
 
     endtime = datetime.datetime.now()
 

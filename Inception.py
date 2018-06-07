@@ -25,7 +25,7 @@ class Inception(object):
         self.l2_reg_lambda = 0.0001     #l2范数的学习率
         self.dropout=0.5               #dropout比例
         self.batch_size=100
-        self.num_epochs = 15
+        self.num_epochs = 1
         self.Model_dir = "Inception"  # 模型参数默认保存位置
 
         self.is_train= tf.placeholder(tf.bool)
@@ -167,6 +167,9 @@ class Inception(object):
         out=tf.nn.max_pool(out,ksize=[1, int(out.shape[1]), 1, 1],strides=[1, 1, 1, 1],padding='VALID',name="pool")
         temp=int(out.shape[1])*int(out.shape[2])*int(out.shape[3])
         out=tf.reshape(out,[-1,temp])
+
+        # with tf.name_scope("dropout"):
+        #     h_drop = tf.nn.dropout(h_pool_flat, self.dropout_keep_prob)
 
         with tf.name_scope("liner"):
             w2 = tf.Variable(tf.truncated_normal([temp, self.num_classes], stddev=0.1),name='weight_line_2')
@@ -317,7 +320,8 @@ class Inception(object):
         self.starttime = datetime.datetime.now()
         self.write_log_infomation("start time : " + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), True)
 
-        for epochnum in range(self.num_epochs):
+        max_epochs = self.num_epochs * 4
+        for epochnum in range(max_epochs):
             batches = self.data.train_batch_iter(self.batch_size)  # batch迭代器
 
             for x_batch, y_batch, batchnum, batchmax in batches:  # 通过迭代器取出batch数据
@@ -335,9 +339,9 @@ class Inception(object):
 
                 if (batchnum % self.num_checkpoints == 0):
                     print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-                    print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, self.num_epochs, batchnum, batchmax))
+                    print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, max_epochs, batchnum, batchmax))
 
-                if (epochnum == self.num_epochs-1 and batchnum == batchmax // 2):
+                if (epochnum == max_epochs-1 and batchnum == batchmax // 2):
                     p, r, f1 = self.testModel()
                     if f1 > f1_max:
                         f1_max = f1
@@ -356,12 +360,12 @@ class Inception(object):
                 print("saved")
             else:
                 self.loadModel()
+                train_num += 1
 
             str = "\n第%d轮训练结束\n时间 : " % (epochnum + 1)
             str += datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             str += '\np : %f , r : %f , f1 : %f\n' % (p, r, f1)
             self.write_log_infomation(str)
-            train_num += 1
 
             if train_num < self.num_epochs:
                 train_op_chioce = self.train_op_array[train_num]
