@@ -1,12 +1,12 @@
 import tensorflow as tf
 import datetime
-from bioasq_dataset import dataset
-# from zhihu_dataset import dataset
+# from bioasq_dataset import dataset
+from zhihu_dataset import dataset
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 class TextCNN(object):
-    def __init__(self, mode=2):
+    def __init__(self, mode=1):
         self.sess = tf.InteractiveSession()
         self.mode=mode
         self.data=dataset(self.mode)             #数据集
@@ -91,24 +91,10 @@ class TextCNN(object):
                 # Convolution Layer1
                 filter_shape = [filter_size, self.embedding_size, 1, self.num_filters//2]
                 conv1=self.convolution_batchnormalization(embedded_chars_expanded,filter_shape,'conv%d_1' % i,padding='VALID')
-                # w = tf.Variable(tf.truncated_normal(filter_shape, stddev=0.1), name="w1_%d" % i)
-                # b = tf.Variable(tf.constant(0.1, shape=[self.num_filters]), name="bias1_%d" % i)
-                #
-                # conv = tf.nn.conv2d(embedded_chars_expanded, w, strides=[1, 1, 1, 1], padding="VALID")
-                # conv = self.batch_norm(conv, self.is_train,name='bn1_%d' % i)
-                #
-                # h = tf.nn.relu(tf.nn.bias_add(conv, b))
 
                 # Convolution Layer2
                 filter_shape1 = [filter_size, 1, self.num_filters//2, self.num_filters]
                 conv2=self.convolution_batchnormalization(conv1,filter_shape1,'conv%d_2' %i,padding='VALID')
-                # w1 = tf.Variable(tf.truncated_normal(filter_shape1, stddev=0.1), name="w2_%d" % i)
-                # b1 = tf.Variable(tf.constant(0.1, shape=[self.num_filters]), name="bias2_%d" % i)
-                #
-                # conv = tf.nn.conv2d(h, w1, strides=[1, 1, 1, 1], padding="VALID")
-                # conv = self.batch_norm(conv, self.is_train,name='bn2_%d' % i)
-                #
-                # h1 = tf.nn.relu(tf.nn.bias_add(conv, b1))
 
                 # Maxpooling over the outputs
                 pooled = tf.nn.max_pool(conv2,ksize=[1, self.sequence_length - 2*filter_size + 2, 1, 1],strides=[1, 1, 1, 1],padding='VALID',name="pool_%d" % i)
@@ -117,7 +103,11 @@ class TextCNN(object):
         # Combine all the pooled features
         num_filters_total = self.num_filters * len(self.filter_sizes)
         h_pool = tf.concat(pooled_outputs, 3)
-        h_pool_flat = tf.reshape(h_pool, [-1, num_filters_total])
+        # h_pool_flat = tf.reshape(h_pool, [-1, num_filters_total])
+
+        w = tf.Variable(tf.truncated_normal([1,1,num_filters_total,num_filters_total//4], stddev=0.1), name="shit")
+        out = tf.nn.conv2d(h_pool, w, strides=[1, 1, 1, 1], padding="VALID")
+        out=tf.reshape(out,[-1,num_filters_total//4])
 
         # Add dropout
         # with tf.name_scope("dropout"):
@@ -125,15 +115,15 @@ class TextCNN(object):
 
         with tf.name_scope("liner"):
             if self.num_classes>3000:
-                w2 = tf.Variable(tf.truncated_normal([num_filters_total, self.num_classes], stddev=0.1),
+                w2 = tf.Variable(tf.truncated_normal([num_filters_total//4, self.num_classes], stddev=0.1),
                                  name='weight_line_2')
                 b2 = tf.Variable(tf.constant(0.1, shape=[self.num_classes]), name='bias_liner_2')
-                liner_out2 = tf.matmul(h_pool_flat, w2) + b2
+                liner_out2 = tf.matmul(out, w2) + b2
             else:
-                temp_num=(num_filters_total+self.num_classes)//2
-                w1 = tf.Variable(tf.truncated_normal([num_filters_total, temp_num],stddev=0.1), name='weight_line_1')
+                temp_num=(num_filters_total//4+self.num_classes)//2
+                w1 = tf.Variable(tf.truncated_normal([num_filters_total//4, temp_num],stddev=0.1), name='weight_line_1')
                 b1 = tf.Variable(tf.constant(0.1, shape=[temp_num]), name='bias_liner_1')
-                liner_out=tf.matmul(h_pool_flat,w1)+b1
+                liner_out=tf.matmul(out,w1)+b1
                 liner_out=self.batch_norm(liner_out,self.is_train,name='bn_liner_1')
                 liner_out=tf.nn.relu(liner_out)
 
