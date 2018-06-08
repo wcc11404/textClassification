@@ -25,7 +25,7 @@ class Inception(object):
         self.l2_reg_lambda = 0.0001     #l2范数的学习率
         self.dropout=0.5               #dropout比例
         self.batch_size=100
-        self.num_epochs = 1
+        self.num_epochs = 10
         self.Model_dir = "Inception"  # 模型参数默认保存位置
 
         self.is_train= tf.placeholder(tf.bool)
@@ -168,8 +168,8 @@ class Inception(object):
         temp=int(out.shape[1])*int(out.shape[2])*int(out.shape[3])
         out=tf.reshape(out,[-1,temp])
 
-        # with tf.name_scope("dropout"):
-        #     h_drop = tf.nn.dropout(h_pool_flat, self.dropout_keep_prob)
+        with tf.name_scope("dropout"):
+            out = tf.nn.dropout(out, self.dropout_keep_prob)
 
         with tf.name_scope("liner"):
             w2 = tf.Variable(tf.truncated_normal([temp, self.num_classes], stddev=0.1),name='weight_line_2')
