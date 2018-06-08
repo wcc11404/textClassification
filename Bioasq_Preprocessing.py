@@ -5,15 +5,16 @@ import random
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 import shutil
+import matplotlib.pyplot as plt
 
 max_length=360
 embedding_num=1701041
 embedding_size=200
 max_train_data=13486072
 label_num=28340
-max_abstract_perfile=300000
-f_in_name="D:/bioasq2018/"
-f_out_name=f_in_name+"out/"
+max_abstract_perfile=20000
+f_in_name="D:/wang/"
+f_out_name=f_in_name+"out1/"
 
 def process_line(line):
     line=line.split("\":")
@@ -85,32 +86,46 @@ def readEmbedding():
         pickle.dump(map, data_f)
 
 def all_abstract_word():
-    tt=[':',',','.','-','(',')']
+    tt=[':',',','.','-','(',')',';','<','>','?','[',']','+','{','}','&','*','/','=','\'s','%'
+        ,'0.1','0.01','0.001','0.0001','>=','<=']
+    ttt=['.',',',':','(',')','?','\'s']
     list_stopwords=list(set(stopwords.words('english')))
     count=Counter()
     iter = getLineIter()
-    len_num=0
-    f=open(f_in_name+'allMeSH_2018_process.txt',mode='w',encoding='utf-8')
+    title_len=[]
+    abstract_len=[]
+    f=open(f_in_name+'allMeSH_2018_process_abstract.txt',mode='w',encoding='utf-8')
+    f1=open(f_in_name+'allMeSH_2018_process_title.txt',mode='w',encoding='utf-8')
     for line, num in iter:
         title = line['title']
-        abstract =line['abstractText']
-        temp=word_tokenize(title.lower())
-        temp.extend(word_tokenize(abstract.lower()))
-        temp=[word for word in temp if word not in list_stopwords]# and word not in tt]
-        len_num+=len(temp)
+        title_temp=word_tokenize(title.lower())
+        title_temp=[word for word in title_temp if word not in list_stopwords and word not in ttt]
 
-        count.update(temp)
+        abstract = line['abstractText']
+        abstract_temp = word_tokenize(abstract.lower())
+        abstract_temp=[word for word in abstract_temp if word not in list_stopwords and word not in tt]
 
-        f.write(' '.join(temp)+'\n')
+        title_len.append(len(title_temp))
+        abstract_len.append(len(abstract_temp))
+
+        count.update(title_temp)
+        count.update(abstract_temp)
+
+        f.write(' '.join(abstract_temp))
+        f1.write(' '.join(title_temp))
 
         if num%5000==0:
             print('finished %f%%'% (num/max_train_data*100))
 
     f.close()
-    print(count.most_common(100))
+    f1.close()
+
     with open(f_in_name + 'model/all_abstact_word.pik', 'wb') as data_f:
         pickle.dump(count, data_f)
-    print(len_num/max_train_data)
+    with open(f_in_name + 'model/title_len.pik', 'wb') as data_f:
+        pickle.dump(title_len, data_f)
+    with open(f_in_name + 'model/abstract_len.pik', 'wb') as data_f:
+        pickle.dump(abstract_len, data_f)
 
 def process_title_abstract(title_abstract,map,cache_embed):
     array = []
@@ -215,7 +230,7 @@ def process_meshMajor():
                 temparray.append(label_map[label])
             except:
                 print('loss '+ label)
-        #temparray=one_hot(temparray)
+        temparray=one_hot(temparray)
         label_array.append(temparray)
 
         if num % max_abstract_perfile==0:
@@ -257,13 +272,36 @@ def process_meshMajor_main():
     with open(f_in_name + 'model/label_array.pik', 'wb') as data_f:
         pickle.dump(label_array, data_f)
 
-def main():
-    # process_meshMajor_main()          #预统计label信息，存储label编码模型
-    process_meshMajor()      #替换所有label为其编码，并分批存储成pickle
+def load_xydata0():
+    with open(f_out_name+'train_data_y/data_0', 'rb') as f:
+        temp_data_x = pickle.load(f)
+    with open(f_out_name+'train_data_y/data_0', 'rb') as f:
+        temp_data_y = pickle.load(f)
 
-    # readEmbedding()                   #预统计embedding信息，存储embedding模型，map['word']='str'形式
-    # all_abstract_word()               #预统计所有title和abstract的单词信息，分词，去除停用词，标点符号，并用counter统计，存储处理后的word
-    process_abstract_main()  #处理上一步处理后的word，将所有word转换成embedding（float形式），分批存储成pickle
+    print('finished')
+    while True:
+        pass
+
+def hist_title_abstract():
+    with open(f_in_name + 'model/title_len.pik', 'rb') as data_f:
+        title_len=pickle.load(data_f)
+    with open(f_in_name + 'model/abstract_len.pik', 'rb') as data_f:
+        abstract_len=pickle.load(data_f)
+
+    plt.hist(title_len,bins=500)
+    plt.hist(abstract_len,bins=500)
+    plt.show()
+
+def main():
+    # process_meshMajor_main() #预统计label信息，存储label编码模型
+    # process_meshMajor()      #替换所有label为其编码，并分批存储成pickle
+
+    # readEmbedding()          #预统计embedding信息，存储embedding模型，map['word']='str'形式
+    all_abstract_word()        #预统计所有title和abstract的单词信息，分词，去除停用词，标点符号，存储到文件，并用counter统计，存储处理后的word
+    # process_abstract_main()  #处理上一步处理后的word，将所有word转换成embedding（float形式），分批存储成pickle
+
+    # load_xydata0()           #测试读取xy数据后内存占用大小
+    # hist_title_abstract()       #观察title和abstract长度直方图
 
 if __name__ == '__main__':
     main()
