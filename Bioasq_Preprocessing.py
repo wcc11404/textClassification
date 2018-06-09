@@ -7,14 +7,15 @@ from nltk.tokenize import word_tokenize
 import shutil
 import matplotlib.pyplot as plt
 
-max_length=360
+max_abstract_length=300
+max_title_length=25
 embedding_num=1701041
 embedding_size=200
 max_train_data=13486072
 label_num=28340
 max_abstract_perfile=20000
-f_in_name="D:/wang/"
-f_out_name=f_in_name+"out1/"
+f_in_name="D:/bioasq2018/"
+f_out_name=f_in_name+"out/"
 
 def process_line(line):
     line=line.split("\":")
@@ -56,14 +57,18 @@ def getLineIter():
             str = f.readline()
 
 def getLineIter2():
-    with open(f_in_name + 'allMeSH_2018_process.txt', 'r', encoding="utf-8") as f:
+    f = open(f_in_name + 'allMeSH_2018_process_abstract.txt', 'r', encoding="utf-8")
+    f1 = open(f_in_name + 'allMeSH_2018_process_title.txt', 'r', encoding="utf-8")
+    str = f.readline()
+    str1 = f1.readline()
+    line_num = 0
+    while str != '':
+        line_num += 1
+        yield str, str1, line_num
         str = f.readline()
-        line_num = 0
-        while str != '':
-            line_num += 1
-
-            yield str, line_num
-            str = f.readline()
+        str1 = f1.readline()
+    f.close()
+    f1.close()
 
 def readEmbedding():
     if not os.path.exists(f_in_name + 'model'):
@@ -86,8 +91,7 @@ def readEmbedding():
         pickle.dump(map, data_f)
 
 def all_abstract_word():
-    tt=[':',',','.','-','(',')',';','<','>','?','[',']','+','{','}','&','*','/','=','\'s','%'
-        ,'0.1','0.01','0.001','0.0001','>=','<=']
+    tt=[':',',','.','-','(',')',';','<','>','?','[',']','+','{','}','&','*','/','=','\'s','%','>=','<=']
     ttt=['.',',',':','(',')','?','\'s']
     list_stopwords=list(set(stopwords.words('english')))
     count=Counter()
@@ -111,8 +115,12 @@ def all_abstract_word():
         count.update(title_temp)
         count.update(abstract_temp)
 
-        f.write(' '.join(abstract_temp))
-        f1.write(' '.join(title_temp))
+        str = ' '.join(abstract_temp)
+        str += '\n'
+        f.write(str)
+        str = ' '.join(title_temp)
+        str += '\n'
+        f1.write(str)
 
         if num%5000==0:
             print('finished %f%%'% (num/max_train_data*100))
@@ -120,16 +128,18 @@ def all_abstract_word():
     f.close()
     f1.close()
 
-    with open(f_in_name + 'model/all_abstact_word.pik', 'wb') as data_f:
+    with open(f_in_name + 'model/all_abstract_word.pik', 'wb') as data_f:
         pickle.dump(count, data_f)
     with open(f_in_name + 'model/title_len.pik', 'wb') as data_f:
         pickle.dump(title_len, data_f)
     with open(f_in_name + 'model/abstract_len.pik', 'wb') as data_f:
         pickle.dump(abstract_len, data_f)
 
-def process_title_abstract(title_abstract,map,cache_embed):
+def process_title_abstract(abstract,title,map,cache_embed):
     array = []
-    for i,word in enumerate(title_abstract):
+
+    #处理标题
+    for i,word in enumerate(title):
         if word in cache_embed:
             n = cache_embed[word]
         elif word in map:
@@ -139,10 +149,29 @@ def process_title_abstract(title_abstract,map,cache_embed):
 
         array.append(n)
 
-        if i==max_length-1: #截断字符
+        if i == max_title_length - 1:  # 截断字符
             break
 
-    length = max_length - len(array)
+    length = max_title_length - len(array)
+    for i in range(length):
+        n = cache_embed['zero_embed']
+        array.append(n)  # 补齐字符
+
+    #处理摘要
+    for i,word in enumerate(abstract):
+        if word in cache_embed:
+            n = cache_embed[word]
+        elif word in map:
+            n = list(float(w) for w in map[word].split(' '))
+        else:
+            n = cache_embed['random_embed']
+
+        array.append(n)
+
+        if i == max_abstract_length - 1:  # 截断字符
+            break
+
+    length = max_title_length + max_abstract_length - len(array)
     for i in range(length):
         n = cache_embed['zero_embed']
         array.append(n)  # 补齐字符
@@ -152,7 +181,7 @@ def process_title_abstract(title_abstract,map,cache_embed):
 def process_abstract_main():
     with open(f_in_name + 'model/embedding.pik', 'rb') as data_f:
         map=pickle.load(data_f)
-    with open(f_in_name + 'model/all_abstact_word.pik', 'rb') as f:
+    with open(f_in_name + 'model/all_abstract_word.pik', 'rb') as f:
         count=pickle.load(f)
 
     if not os.path.exists(f_out_name + 'train_data_x'):
@@ -183,15 +212,15 @@ def process_abstract_main():
     iter=getLineIter2()
     abstract_array = []
     File_num = 0
-    for line,num in iter:
-        line=line.strip().split(' ')
-        title_abstract = process_title_abstract(line, map, cache_embed)
+    for line_abstract, line_title, num in iter:
+        line_abstract = line_abstract[:-1].strip().split(' ')
+        line_title = line_title[:-1].strip().split(' ')
+        title_abstract = process_title_abstract(line_abstract, line_title, map, cache_embed)
         abstract_array.append(title_abstract)
 
         if num % max_abstract_perfile == 0:
             with open(f_out_name + 'train_data_x/data_%d' % File_num, 'wb') as data_f:
                 pickle.dump(abstract_array,data_f)
-            # bcolz.carray(abstract_array, rootdir=f_out_name + 'train_data_x/data_%d' % File_num, mode='w')
             print("saved file %d/%d" % (File_num,13486072//max_abstract_perfile+1))
             File_num += 1
             del abstract_array
@@ -200,7 +229,6 @@ def process_abstract_main():
     if len(abstract_array)!=0:
         with open(f_out_name + 'train_data_x/data_%d' % File_num, 'wb') as data_f:
             pickle.dump(abstract_array, data_f)
-        # bcolz.carray(abstract_array, rootdir=f_out_name + 'train_data_x/data_%d' % File_num, mode='w')
         print("saved file %d/%d" % (File_num, max_train_data // max_abstract_perfile + 1))
 
 def one_hot(x):
@@ -236,7 +264,6 @@ def process_meshMajor():
         if num % max_abstract_perfile==0:
             with open(f_out_name + 'train_data_y/data_%d' % File_num, 'wb') as data_f:
                 pickle.dump(label_array,data_f)
-            # bcolz.carray(a, rootdir='D:/wang/train_data_y/data_0', mode='w')
             print("saved file %d/%d" % (File_num, max_train_data // max_abstract_perfile + 1))
             File_num += 1
             del label_array
@@ -288,8 +315,21 @@ def hist_title_abstract():
     with open(f_in_name + 'model/abstract_len.pik', 'rb') as data_f:
         abstract_len=pickle.load(data_f)
 
-    plt.hist(title_len,bins=500)
-    plt.hist(abstract_len,bins=500)
+    temp=abstract_len
+    max_len=0
+    min_len=500
+    sum=0
+    num=0
+    for i in temp:
+        if i>max_len:
+            max_len=i
+        if i<min_len:
+            min_len=i
+        if i>300:
+            num+=1
+        sum+=i
+    print(max_len,min_len,sum/len(temp),num,len(temp))
+    plt.hist(temp,bins=500)
     plt.show()
 
 def main():
