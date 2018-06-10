@@ -321,8 +321,8 @@ def process_meshMajor_main():
 
 def load_xydata0():
     starttime = datetime.datetime.now()
-    # with open(f_out_name+'train_data_y/data_0', 'rb') as f:
-    #     temp_data_x = pickle.load(f)
+    with open(f_out_name+'train_data_y/data_0', 'rb') as f:
+        temp_data_x = pickle.load(f)
     with open(f_out_name+'train_data_y/data_0', 'rb') as f:
         temp_data_y = pickle.load(f)
 
@@ -330,8 +330,7 @@ def load_xydata0():
     for i in temp_data_y:
         a=np.array([0 for j in i])
         b=np.array([1 for j in i])
-        c=np.array(i)
-        tt.append(sparse.csr_matrix((b,(a,c)),shape=(1,label_num)).toarray().reshape((label_num)))
+        tt.append(sparse.csr_matrix((b,(a,i)),shape=(1,label_num)).toarray().reshape((label_num)))
     endtime = datetime.datetime.now()
     print((endtime - starttime).seconds)
 
