@@ -1,19 +1,21 @@
 import numpy as np
 import pickle
+import scipy.sparse as sparse
 import datetime
 
 class dataset(object):
     def __init__(self,mode=1):
-        self.data_dir = "D:/wang/"
-        self.train_data_x_dir = self.data_dir + "out/train_data_x/data_"
-        self.train_data_y_dir = self.data_dir + "out/train_data_y/data_"
+        self.data_dir = "E:/D盘数据备份/out/"
+        self.train_data_x_dir = self.data_dir + "train_data_x/data_"
+        self.train_data_y_dir = self.data_dir + "train_data_y/data_"
 
         self.max_sentence_size=360
         self.vy_num=28340
         self.vx_num=0
         self.vx_size=200
-        self.max_file_num=45
-        self.max_train_file_num=self.max_file_num-1 #0-43号文件作为训练文件
+        self.max_file_num=338
+        self.max_train_file_num=75
+        self.test_file_num=1
 
         self.mode=mode
         self.name='bioasq'
@@ -27,21 +29,21 @@ class dataset(object):
     def load_vocabulary(self):
         return None
 
-    def process_X(self,x):
+    def process_X(self,x):#弃用
         temp_x=[]
         for i in range(len(x)):
             temp_x.append(list(float(w) for w in x[i].split(' ')))
         return temp_x
 
     def process_Y(self,y):
-        result=[0 for i in range(self.vy_num)]
-        for i in y:
-            result[i] = 1
+        a = np.array([0 for j in y])
+        b = np.array([1 for j in y])
+        result = sparse.csr_matrix((b, (a, y)), shape=(1, self.vy_num)).toarray().reshape((self.vy_num))
         return result
 
     def train_batch_iter(self, batch_size):
         # for epoch in range(num_epochs):
-        for i in range(10):#self.max_train_file_num+1
+        for i in range(self.max_train_file_num):
             with open(self.train_data_x_dir + '%d' % i, 'rb') as f:
                 temp_data_x=pickle.load(f)
             with open(self.train_data_y_dir + '%d' % i, 'rb') as f:
@@ -55,8 +57,7 @@ class dataset(object):
                 min_num=k*batch_size
                 max_num=min((k+1)*batch_size,train_num)
                 for j in range(min_num,max_num):
-                    # x = self.process_X(temp_data_x[j])
-                    x=temp_data_x[i]
+                    x = temp_data_x[i]
                     y = self.process_Y(temp_data_y[j])
                     X.append(x)
                     Y.append(y)
@@ -78,8 +79,7 @@ class dataset(object):
             min_num=k*batch_size
             max_num=min((k+1)*batch_size,train_num)
             for j in range(min_num,max_num):
-                # x = self.process_X(temp_data_x[j])
-                x=temp_data_x[j]
+                x = temp_data_x[j]
                 y = self.process_Y(self.temp_data_y[j])
                 X.append(x)
                 Y.append(y)
@@ -91,7 +91,6 @@ class dataset(object):
         self.fenzi = 0.0
         self.p_fenmu = 0.0
         self.r_fenmu = 0.0
-        self.f1 = 0.0
 
     def get_evalution_result(self):
         p = self.fenzi / self.p_fenmu
@@ -142,8 +141,8 @@ def main():
         print(y[0])
         print(len(x[0]))
         print(len(y[0]))
-        a=np.array(y[0])
-        print(np.where(a==1.))
+        c=np.array(y[0])
+        print(np.where(c==1.))
         if a%1==0:
             break
 
