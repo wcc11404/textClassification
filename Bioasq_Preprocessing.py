@@ -6,6 +6,9 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 import shutil
 import matplotlib.pyplot as plt
+import scipy.sparse as sparse
+import numpy as np
+import datetime
 
 max_abstract_length=300
 max_title_length=25
@@ -13,9 +16,9 @@ embedding_num=1701041
 embedding_size=200
 max_train_data=13486072
 label_num=28340
-max_abstract_perfile=20000
+max_abstract_perfile=30000
 f_in_name="D:/bioasq2018/"
-f_out_name=f_in_name+"out/"
+f_out_name="E:/D盘数据备份/out/"#f_in_name+"out/"
 
 def process_line(line):
     line=line.split("\":")
@@ -221,7 +224,7 @@ def process_abstract_main():
         if num % max_abstract_perfile == 0:
             with open(f_out_name + 'train_data_x/data_%d' % File_num, 'wb') as data_f:
                 pickle.dump(abstract_array,data_f)
-            print("saved file %d/%d" % (File_num,13486072//max_abstract_perfile+1))
+            print("saved file %d/%d" % (File_num,max_train_data//max_abstract_perfile+1))
             File_num += 1
             del abstract_array
             abstract_array = []
@@ -232,9 +235,26 @@ def process_abstract_main():
         print("saved file %d/%d" % (File_num, max_train_data // max_abstract_perfile + 1))
 
 def one_hot(x):
-    result=[0 for _ in range(label_num)]
-    for i in x:
-        result[i]=1
+    # result=[0 for _ in range(label_num)]
+    # for i in x:
+    #     result[i]=1
+    # return result
+
+# t=np.array([0,0,0])
+# a=np.array([1,3,5])
+# b=np.array([1,1,1])
+# c=sparse.csr_matrix((b,(t,a)),shape=(1,6)).toarray().reshape((6))
+# print(c)
+
+    # t=np.array([0 for i in x])
+    # a=np.array(x)
+    # b=np.array([1 for i in x])
+    # result=[]
+    # result.append(t)
+    # result.append(a)
+    # result.append(b)
+    result=x
+    # result=np.array(x)
     return result
 
 def process_meshMajor():
@@ -300,12 +320,23 @@ def process_meshMajor_main():
         pickle.dump(label_array, data_f)
 
 def load_xydata0():
-    with open(f_out_name+'train_data_y/data_0', 'rb') as f:
-        temp_data_x = pickle.load(f)
+    starttime = datetime.datetime.now()
+    # with open(f_out_name+'train_data_y/data_0', 'rb') as f:
+    #     temp_data_x = pickle.load(f)
     with open(f_out_name+'train_data_y/data_0', 'rb') as f:
         temp_data_y = pickle.load(f)
 
-    print('finished')
+    tt=[]
+    for i in temp_data_y:
+        a=np.array([0 for j in i])
+        b=np.array([1 for j in i])
+        c=np.array(i)
+        tt.append(sparse.csr_matrix((b,(a,c)),shape=(1,label_num)).toarray().reshape((label_num)))
+    endtime = datetime.datetime.now()
+    print((endtime - starttime).seconds)
+
+    del temp_data_y
+
     while True:
         pass
 
@@ -334,11 +365,11 @@ def hist_title_abstract():
 
 def main():
     # process_meshMajor_main() #预统计label信息，存储label编码模型
-    # process_meshMajor()      #替换所有label为其编码，并分批存储成pickle
+    process_meshMajor()      #替换所有label为其编码，并分批存储成pickle
 
     # readEmbedding()          #预统计embedding信息，存储embedding模型，map['word']='str'形式
-    all_abstract_word()        #预统计所有title和abstract的单词信息，分词，去除停用词，标点符号，存储到文件，并用counter统计，存储处理后的word
-    # process_abstract_main()  #处理上一步处理后的word，将所有word转换成embedding（float形式），分批存储成pickle
+    # all_abstract_word()        #预统计所有title和abstract的单词信息，分词，去除停用词，标点符号，存储到文件，并用counter统计，存储处理后的word
+    process_abstract_main()  #处理上一步处理后的word，将所有word转换成embedding（float形式），分批存储成pickle
 
     # load_xydata0()           #测试读取xy数据后内存占用大小
     # hist_title_abstract()       #观察title和abstract长度直方图
