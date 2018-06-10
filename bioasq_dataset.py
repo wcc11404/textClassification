@@ -9,7 +9,7 @@ class dataset(object):
         self.train_data_x_dir = self.data_dir + "train_data_x/data_"
         self.train_data_y_dir = self.data_dir + "train_data_y/data_"
 
-        self.max_sentence_size=360
+        self.max_sentence_size=325
         self.vy_num=28340
         self.vx_num=0
         self.vx_size=200
@@ -61,7 +61,7 @@ class dataset(object):
                     y = self.process_Y(temp_data_y[j])
                     X.append(x)
                     Y.append(y)
-                yield X,Y,k+i*tempnum+1,tempnum*(self.max_file_num+1)
+                yield X,Y,k+i*tempnum+1,tempnum*self.max_train_file_num
 
     def dev_batch_iter(self,batch_size=50):
         with open(self.train_data_x_dir + '%d' % self.max_train_file_num, 'rb') as f:

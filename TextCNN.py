@@ -13,15 +13,15 @@ class TextCNN(object):
 
         self.sequence_length,self.num_classes,self.vocab_size,self.embedding_size=self.data.get_param()
 
-        self.filter_sizes=[1,2,3,4,5]       #cnn    filter大小,kernel为[filter,embedding_size]
-        self.num_filters=128            #cnn    filter数量
+        self.filter_sizes=[1,3,5,7,9]       #cnn    filter大小,kernel为[filter,embedding_size]
+        self.num_filters=400            #cnn    filter数量
 
         # self.decay_steps = 2500
         # self.decay_rate = 0.65
         #self.learning_rate = tf.Variable(1e-3, trainable=False, name="learning_rate")  # ADD learning_rate
 
-        self.l2_reg_lambda = 0.0001  # l2范数的学习率
-        self.mode_learning_rate = 4e-4
+        self.l2_reg_lambda = 0.001  # l2范数的学习率
+        self.mode_learning_rate = 5e-4
         self.embed_learning_rate = 2e-4
         self.num_checkpoints=100       #打印的频率
         self.dropout=0.5               #dropout比例
@@ -103,11 +103,7 @@ class TextCNN(object):
         # Combine all the pooled features
         num_filters_total = self.num_filters * len(self.filter_sizes)
         h_pool = tf.concat(pooled_outputs, 3)
-        # h_pool_flat = tf.reshape(h_pool, [-1, num_filters_total])
-
-        w = tf.Variable(tf.truncated_normal([1,1,num_filters_total,num_filters_total//4], stddev=0.1), name="shit")
-        out = tf.nn.conv2d(h_pool, w, strides=[1, 1, 1, 1], padding="VALID")
-        out=tf.reshape(out,[-1,num_filters_total//4])
+        h_pool_flat = tf.reshape(h_pool, [-1, num_filters_total])
 
         # Add dropout
         # with tf.name_scope("dropout"):
@@ -115,15 +111,15 @@ class TextCNN(object):
 
         with tf.name_scope("liner"):
             if self.num_classes>3000:
-                w2 = tf.Variable(tf.truncated_normal([num_filters_total//4, self.num_classes], stddev=0.1),
+                w2 = tf.Variable(tf.truncated_normal([num_filters_total, self.num_classes], stddev=0.1),
                                  name='weight_line_2')
                 b2 = tf.Variable(tf.constant(0.1, shape=[self.num_classes]), name='bias_liner_2')
-                liner_out2 = tf.matmul(out, w2) + b2
+                liner_out2 = tf.matmul(h_pool_flat, w2) + b2
             else:
-                temp_num=(num_filters_total//4+self.num_classes)//2
-                w1 = tf.Variable(tf.truncated_normal([num_filters_total//4, temp_num],stddev=0.1), name='weight_line_1')
+                temp_num=(num_filters_total+self.num_classes)//2
+                w1 = tf.Variable(tf.truncated_normal([num_filters_total, temp_num],stddev=0.1), name='weight_line_1')
                 b1 = tf.Variable(tf.constant(0.1, shape=[temp_num]), name='bias_liner_1')
-                liner_out=tf.matmul(out,w1)+b1
+                liner_out=tf.matmul(h_pool_flat,w1)+b1
                 liner_out=self.batch_norm(liner_out,self.is_train,name='bn_liner_1')
                 liner_out=tf.nn.relu(liner_out)
 
