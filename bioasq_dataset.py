@@ -14,8 +14,8 @@ class dataset(object):
         self.vx_num=0
         self.vx_size=200
         self.max_file_num=338
-        self.max_train_file_num=75
-        self.test_file_num=1
+        self.train_file_num=[75,149]
+        self.test_file_num=[150,150]
 
         self.mode=mode
         self.name='bioasq'
@@ -43,7 +43,7 @@ class dataset(object):
 
     def train_batch_iter(self, batch_size):
         # for epoch in range(num_epochs):
-        for i in range(self.max_train_file_num):
+        for i in range(self.train_file_num[0],self.train_file_num[1]+1):
             with open(self.train_data_x_dir + '%d' % i, 'rb') as f:
                 temp_data_x=pickle.load(f)
             with open(self.train_data_y_dir + '%d' % i, 'rb') as f:
@@ -61,31 +61,32 @@ class dataset(object):
                     y = self.process_Y(temp_data_y[j])
                     X.append(x)
                     Y.append(y)
-                yield X,Y,k+i*tempnum+1,tempnum*self.max_train_file_num
+                yield X,Y,k+i*tempnum+1,tempnum*(self.train_file_num[1]-self.train_file_num[0]+1)
 
     def dev_batch_iter(self,batch_size=50):
-        with open(self.train_data_x_dir + '%d' % self.max_train_file_num, 'rb') as f:
-            temp_data_x=pickle.load(f)
-        with open(self.train_data_y_dir + '%d' % self.max_train_file_num, 'rb') as f:
-            self.temp_data_y=pickle.load(f)
+        for i in range(self.test_file_num[0],self.test_file_num[1]+1):
+            with open(self.train_data_x_dir + '%d' % i, 'rb') as f:
+                temp_data_x=pickle.load(f)
+            with open(self.train_data_y_dir + '%d' % i, 'rb') as f:
+                self.temp_data_y=pickle.load(f)
 
-        self.index=0    #bioasq数据集测试专用
+            self.index=0    #bioasq数据集测试专用
 
-        train_num=len(temp_data_x)
-        tempnum=(train_num-1)//batch_size+1
-        for k in range(tempnum):
-            X = []
-            Y = []
-            min_num=k*batch_size
-            max_num=min((k+1)*batch_size,train_num)
-            for j in range(min_num,max_num):
-                x = temp_data_x[j]
-                y = self.process_Y(self.temp_data_y[j])
-                X.append(x)
-                Y.append(y)
-            yield X,Y
+            train_num=len(temp_data_x)
+            tempnum=(train_num-1)//batch_size+1
+            for k in range(tempnum):
+                X = []
+                Y = []
+                min_num=k*batch_size
+                max_num=min((k+1)*batch_size,train_num)
+                for j in range(min_num,max_num):
+                    x = temp_data_x[j]
+                    y = self.process_Y(self.temp_data_y[j])
+                    X.append(x)
+                    Y.append(y)
+                yield X,Y
 
-        del self.temp_data_y
+            del self.temp_data_y
 
     def init_evalution(self):
         self.fenzi = 0.0
