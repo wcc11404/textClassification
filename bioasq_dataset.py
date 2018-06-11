@@ -4,8 +4,11 @@ import scipy.sparse as sparse
 import datetime
 
 class dataset(object):
-    def __init__(self,mode=1):
-        self.data_dir = "E:/D盘数据备份/out/"
+    def __init__(self,mode=1,desktop=1):
+        if desktop==1:
+            self.data_dir = "D:/wang/out/"
+        elif desktop==2:
+            self.data_dir = "E:/D盘数据备份/out/"
         self.train_data_x_dir = self.data_dir + "train_data_x/data_"
         self.train_data_y_dir = self.data_dir + "train_data_y/data_"
 

@@ -17,8 +17,13 @@ embedding_size=200
 max_train_data=13486072
 label_num=28340
 max_abstract_perfile=40000
-f_in_name="D:/bioasq2018/"
-f_out_name="E:/D盘数据备份/out/"#f_in_name+"out/"
+desktop=1
+if desktop==1:
+    f_in_name="D:/wang/"
+    f_out_name=f_in_name+"out/"
+elif desktop==2:
+    f_in_name="D:/bioasq2018/"
+    f_out_name="E:/D盘数据备份/out/"
 
 def process_line(line):
     line=line.split("\":")
