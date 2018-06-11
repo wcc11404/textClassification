@@ -61,7 +61,7 @@ class dataset(object):
                     y = self.process_Y(temp_data_y[j])
                     X.append(x)
                     Y.append(y)
-                yield X,Y,k+i*tempnum+1,tempnum*(self.train_file_num[1]-self.train_file_num[0]+1)
+                yield X,Y,k+(i-self.train_file_num[0])*tempnum+1,tempnum*(self.train_file_num[1]-self.train_file_num[0]+1)
 
     def dev_batch_iter(self,batch_size=50):
         for i in range(self.test_file_num[0],self.test_file_num[1]+1):
