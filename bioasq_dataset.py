@@ -84,9 +84,9 @@ class dataset(object):
                 max_num=min((k+1)*batch_size,train_num)
                 for j in range(min_num,max_num):
                     x = temp_data_x[j]
-                    #y = self.process_Y(self.temp_data_y[j])
+                    y = self.process_Y(self.temp_data_y[j])
                     X.append(x)
-                    Y.append(0)
+                    Y.append(y)
                 yield X,Y
 
             del self.temp_data_y
