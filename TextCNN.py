@@ -60,6 +60,7 @@ class TextCNN(object):
             w=tf.get_variable("weight_conv",shape,tf.float32,init)
             b=tf.get_variable("bias_conv",[shape[3]],tf.float32,tf.constant_initializer(0.1))
             conv=tf.nn.conv2d(input,w,strides,padding)
+            #tf.nn.convolution(dilation_rate)
             conv=self.batch_norm(conv,self.is_train,name=scope)
             conv=tf.nn.relu(tf.nn.bias_add(conv,b))
             return conv
@@ -167,6 +168,7 @@ class TextCNN(object):
 
         grads=tf.gradients(self.loss,var_expect_embedding+var_embedding)
         grads1=grads[:len(var_expect_embedding)]
+        self.summary_grads=grads1
         grads2=grads[len(var_expect_embedding):]
 
         self.train_op_array=[]
@@ -206,9 +208,10 @@ class TextCNN(object):
         # Summaries for loss and accuracy
         loss_summary = tf.summary.scalar("loss", self.loss)
         # acc_summary = tf.summary.scalar("accuracy", self.accuracy)
+        grads=tf.summary.histogram("grads",self.summary_grads)
 
         # 训练集的记录
-        self.train_summary_op = tf.summary.merge([loss_summary])    #归并记录, grad_summaries_merged
+        self.train_summary_op = tf.summary.merge([loss_summary,grads])    #归并记录, grad_summaries_merged
         train_summary_dir = os.path.join(out_dir, "train")
         self.train_summary_writer = tf.summary.FileWriter(train_summary_dir, self.sess.graph)   #类似打开文件操作
 
