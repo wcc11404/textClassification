@@ -1,7 +1,7 @@
 import tensorflow as tf
 import datetime
-# from zhihu_sample_dataset import dataset
-from zhihu_dataset import dataset
+from bioasq_dataset import dataset
+# from zhihu_dataset import dataset
 from tensorflow.contrib import rnn
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -21,9 +21,9 @@ class TextRNN(object):
         self.l2_reg_lambda = 0.0001     #l2范数的学习率
         self.num_checkpoints = 100  # 打印的频率
         self.dropout=1.0               #dropout比例
-        self.mode_learning_rate = 1e-2
+        self.mode_learning_rate = 5e-4
         self.embed_learning_rate = 2e-4
-        self.batch_size=64
+        self.batch_size=50
         self.num_epochs = 10            #总的训练次数
         self.Model_dir = "TextRNN"  # 模型参数默认保存位置
 
@@ -216,7 +216,7 @@ class TextRNN(object):
             batches = self.data.train_batch_iter(self.batch_size)  # batch迭代器
 
             for x_batch, y_batch, batchnum, batchmax in batches:  # 通过迭代器取出batch数据
-                self.sess.graph.finalize()
+                # self.sess.graph.finalize()
 
                 feed_dict = {self.input_x: x_batch, self.input_y: y_batch, self.dropout_keep_prob: self.dropout,
                              self.is_train: True}
@@ -232,7 +232,7 @@ class TextRNN(object):
                     print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                     print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, self.num_epochs, batchnum, batchmax))
 
-                if (epochnum == self.num_epochs-1 and batchnum == batchmax // 2):
+                if batchnum%20001==0 or (epochnum == self.num_epochs-1 and batchnum == batchmax // 2):
                     p, r, f1 = self.testModel()
                     if f1 > f1_max:
                         f1_max = f1
@@ -249,14 +249,14 @@ class TextRNN(object):
                 f1_max = f1
                 self.saveModel()
                 print("saved")
-            else:
-                self.loadModel()
+            # else:
+            #     self.loadModel()
 
             str = "\n第%d轮训练结束\n时间 : " % (epochnum + 1)
             str += datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             str += '\np : %f , r : %f , f1 : %f\n' % (p, r, f1)
             self.write_log_infomation(str)
-            train_num += 1
+            # train_num += 1
 
             if train_num < self.num_epochs:
                 train_op_chioce = self.train_op_array[train_num]

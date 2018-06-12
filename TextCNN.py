@@ -308,8 +308,8 @@ class TextCNN(object):
                 f1_max = f1
                 self.saveModel()
                 print("saved")
-            else:
-                self.loadModel()
+            # else:
+            #     self.loadModel()
 
             str = "\n第%d轮训练结束\n时间 : " % (epochnum + 1)
             str += datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
