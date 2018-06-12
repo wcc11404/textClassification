@@ -58,7 +58,7 @@ class TextRNN(object):
             #     lstm_fw_cell = tf.contrib.rnn.DropoutWrapper(lstm_fw_cell, output_keep_prob=self.dropout_keep_prob)
             #     lstm_bw_cell = tf.contrib.rnn.DropoutWrapper(lstm_bw_cell, output_keep_prob=self.dropout_keep_prob)
 
-            outputs,_=tf.nn.bidirectional_dynamic_rnn(mlstm_fw_cell,mlstm_bw_cell,embedded_chars,dtype=tf.float32,scope="LSTM_1") #[batch_size,sequence_length,hidden_size] #creates a dynamic bidirectional recurrent neural network
+            outputs,_=tf.nn.bidirectional_dynamic_rnn(lstm_fw_cell,lstm_bw_cell,embedded_chars,dtype=tf.float32,scope="LSTM_1") #[batch_size,sequence_length,hidden_size] #creates a dynamic bidirectional recurrent neural network
             output_rnn = tf.concat(outputs, axis=2)  # [batch_size,sequence_length,hidden_size*2]
 
         output_rnn=tf.expand_dims(output_rnn,-1)
