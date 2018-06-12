@@ -329,7 +329,7 @@ class Inception(object):
 
                 feed_dict = {self.input_x: x_batch, self.input_y: y_batch, self.dropout_keep_prob: self.dropout,
                              self.is_train: True}
-                if epochnum>=1:
+                if self.vocab_size!=0 and epochnum>=1:
                     _,_, summaries, loss, step = self.sess.run(
                         [self.train_embedding_op,train_op_chioce, self.train_summary_op, self.loss, self.global_step], feed_dict=feed_dict)
                 else:
