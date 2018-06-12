@@ -17,8 +17,8 @@ class dataset(object):
         self.vx_num=0
         self.vx_size=200
         self.max_file_num=338
-        self.train_file_num=[75,149]
-        self.test_file_num=[150,150]
+        self.train_file_num=[0,74]
+        self.test_file_num=[75,75]
 
         self.mode=mode
         self.name='bioasq'
