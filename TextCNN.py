@@ -25,7 +25,7 @@ class TextCNN(object):
         self.embed_learning_rate = 2e-4
         self.num_checkpoints=100       #打印的频率
         self.dropout=0.5               #dropout比例
-        self.batch_size=50
+        self.batch_size=100
         self.num_epochs = 10            #总的训练次数
         self.Model_dir = "TextCNN"  # 模型参数默认保存位置
 
@@ -208,10 +208,10 @@ class TextCNN(object):
         # Summaries for loss and accuracy
         loss_summary = tf.summary.scalar("loss", self.loss)
         # acc_summary = tf.summary.scalar("accuracy", self.accuracy)
-        grads=tf.summary.histogram("grads",self.summary_grads)
+        # grads=tf.summary.histogram("grads",self.summary_grads)
 
         # 训练集的记录
-        self.train_summary_op = tf.summary.merge([loss_summary,grads])    #归并记录, grad_summaries_merged
+        self.train_summary_op = tf.summary.merge([loss_summary])    #归并记录, grad_summaries_merged
         train_summary_dir = os.path.join(out_dir, "train")
         self.train_summary_writer = tf.summary.FileWriter(train_summary_dir, self.sess.graph)   #类似打开文件操作
 
@@ -286,15 +286,16 @@ class TextCNN(object):
                     _,_, summaries, loss, step = self.sess.run(
                         [self.train_embedding_op,train_op_chioce, self.train_summary_op, self.loss, self.global_step], feed_dict=feed_dict)
                 else:
-                    _, summaries, loss, step = self.sess.run(
-                        [train_op_chioce, self.train_summary_op, self.loss, self.global_step], feed_dict=feed_dict)
+                    _, summaries, loss, step ,shit= self.sess.run(
+                        [train_op_chioce, self.train_summary_op, self.loss, self.global_step,self.summary_grads], feed_dict=feed_dict)
                 self.train_summary_writer.add_summary(summaries, step)  # 对记录文件添加上边run出的记录和step数
 
                 if (batchnum % self.num_checkpoints == 0):
                     print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                     print('epoch:%d/%d\tbatch:%d/%d\tloss:%f' % (epochnum, self.num_epochs, batchnum, batchmax,loss))
 
-                if batchnum%20001==0 or (epochnum == self.num_epochs-1 and batchnum == batchmax // 2):
+                if batchnum%1000==0 or (epochnum == self.num_epochs-1 and batchnum == batchmax // 2):
+                    print(shit)
                     p, r, f1 = self.testModel()
                     if f1 > f1_max:
                         f1_max = f1
@@ -304,6 +305,8 @@ class TextCNN(object):
                     str += datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     str += '\np : %f , r : %f , f1 : %f\n' % (p, r, f1)
                     self.write_log_infomation(str)
+
+                    p, r, f1 = self.testModel(test_file=[0,0])
 
             # 结束一轮训练后，测试
             p, r, f1 = self.testModel()
@@ -330,9 +333,9 @@ class TextCNN(object):
 
         self.write_log_infomation('\n最大F值为 : %f' % f1_max)
 
-    def testModel(self):
+    def testModel(self,test_file=None):
         self.data.init_evalution()
-        dev_iter = self.data.dev_batch_iter()
+        dev_iter = self.data.dev_batch_iter(test_file=test_file)
 
         for x,y in dev_iter:
             feed_dict = {self.input_x: x, self.input_y: y, self.dropout_keep_prob: 1.0,self.is_train:False}

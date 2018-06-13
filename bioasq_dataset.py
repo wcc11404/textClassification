@@ -4,7 +4,7 @@ import scipy.sparse as sparse
 import datetime
 
 class dataset(object):
-    def __init__(self,mode=1,desktop=2):
+    def __init__(self,mode=1,desktop=1):
         if desktop==1:
             self.data_dir = "D:/wang/out/"
         elif desktop==2:
@@ -66,8 +66,15 @@ class dataset(object):
                     Y.append(y)
                 yield X,Y,k+(i-self.train_file_num[0])*tempnum+1,tempnum*(self.train_file_num[1]-self.train_file_num[0]+1)
 
-    def dev_batch_iter(self,batch_size=50):
-        for i in range(self.test_file_num[0],self.test_file_num[1]+1):
+    def dev_batch_iter(self,batch_size=50,test_file=None):
+        if test_file!=None:
+            left=test_file[0]
+            right=test_file[1]+1
+        else:
+            left=self.test_file_num[0]
+            right=self.test_file_num[1]+1
+
+        for i in range(left,right):
             with open(self.train_data_x_dir + '%d' % i, 'rb') as f:
                 temp_data_x=pickle.load(f)
             with open(self.train_data_y_dir + '%d' % i, 'rb') as f:
