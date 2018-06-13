@@ -20,7 +20,7 @@ class TextCNN(object):
         # self.decay_rate = 0.65
         #self.learning_rate = tf.Variable(1e-3, trainable=False, name="learning_rate")  # ADD learning_rate
 
-        self.l2_reg_lambda = 0.001  # l2范数的学习率
+        self.l2_reg_lambda = 0.0001  # l2范数的学习率
         self.mode_learning_rate = 5e-4
         self.embed_learning_rate = 2e-4
         self.num_checkpoints=100       #打印的频率
@@ -294,12 +294,12 @@ class TextCNN(object):
                     print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                     print('epoch:%d/%d\tbatch:%d/%d\tloss:%f' % (epochnum, self.num_epochs, batchnum, batchmax,loss))
 
-                if batchnum%5001==0 or (epochnum == self.num_epochs-1 and batchnum == batchmax // 2):
+                if batchnum%20001==0 or (epochnum == self.num_epochs-1 and batchnum == batchmax // 2):
                     p, r, f1 = self.testModel()
-                    if f1 > f1_max:
-                        f1_max = f1
-                        self.saveModel()
-                        print("saved")
+                    # if f1 > f1_max:
+                    #     f1_max = f1
+                    #     self.saveModel()
+                    #     print("saved")
                     str = "\n第%d轮训练一半\n时间 : " % (epochnum + 1)
                     str += datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     str += '\np : %f , r : %f , f1 : %f\n' % (p, r, f1)
@@ -311,14 +311,14 @@ class TextCNN(object):
                 f1_max = f1
                 self.saveModel()
                 print("saved")
-            # else:
-            #     self.loadModel()
+            else:
+                self.loadModel()
 
             str = "\n第%d轮训练结束\n时间 : " % (epochnum + 1)
             str += datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             str += '\np : %f , r : %f , f1 : %f\n' % (p, r, f1)
             self.write_log_infomation(str)
-            #train_num += 1
+            train_num += 1
 
             if train_num < self.num_epochs:
                 train_op_chioce = self.train_op_array[train_num]

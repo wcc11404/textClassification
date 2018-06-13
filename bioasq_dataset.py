@@ -4,7 +4,7 @@ import scipy.sparse as sparse
 import datetime
 
 class dataset(object):
-    def __init__(self,mode=1,desktop=2):
+    def __init__(self,mode=1,desktop=1):
         if desktop==1:
             self.data_dir = "D:/wang/out/"
         elif desktop==2:
@@ -110,7 +110,7 @@ class dataset(object):
         return p, r, f1
 
     def evalution(self,logits, label):      #计算微平均
-        label_list = self.get_label_using_logits(logits,top_number=5)
+        label_list = self.get_label_using_logits(logits,top_number=10)
         # eval_y_short = self.get_target_label_short(label)
         eval_y_short=self.temp_data_y[self.index]
         self.index+=1

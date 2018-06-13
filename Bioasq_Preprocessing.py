@@ -367,6 +367,19 @@ def hist_title_abstract():
     plt.hist(temp,bins=500)
     plt.show()
 
+def hist_MeshMajor():
+    arr=[]
+    sum=0
+    for i in range(338):
+        with open(f_out_name+'train_data_y/data_%d' % i, 'rb') as f:
+            temp_data_y = pickle.load(f)
+        for label in temp_data_y:
+            arr.append(len(label))
+            sum+=len(label)
+    print(sum/len(arr)) #75:13  338:12.68
+    plt.hist(arr,bins=500)
+    plt.show()
+
 def main():
     # process_meshMajor_main() #预统计label信息，存储label编码模型
     # process_meshMajor()      #替换所有label为其编码，并分批存储成pickle
@@ -375,8 +388,9 @@ def main():
     # all_abstract_word()        #预统计所有title和abstract的单词信息，分词，去除停用词，标点符号，存储到文件，并用counter统计，存储处理后的word
     # process_abstract_main()  #处理上一步处理后的word，将所有word转换成embedding（float形式），分批存储成pickle
 
-    load_xydata0()           #测试读取xy数据后内存占用大小
+    # load_xydata0()           #测试读取xy数据后内存占用大小
     # hist_title_abstract()       #观察title和abstract长度直方图
+    hist_MeshMajor()            #观察标签数量直方图
 
 if __name__ == '__main__':
     main()
