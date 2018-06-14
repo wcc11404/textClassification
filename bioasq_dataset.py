@@ -4,7 +4,7 @@ import scipy.sparse as sparse
 import datetime
 
 class dataset(object):
-    def __init__(self,mode=1,desktop=1):
+    def __init__(self,mode=1,desktop=2):
         if desktop==1:
             self.data_dir = "D:/wang/out/"
         elif desktop==2:
