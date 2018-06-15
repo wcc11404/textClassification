@@ -18,7 +18,7 @@ class TextRNN(object):
         # self.decay_rate = 0.5  # 62
         #self.learning_rate = tf.Variable(1e-2, trainable=False, name="learning_rate")  # ADD learning_rate
 
-        self.l2_reg_lambda = 0.0001     #l2范数的学习率
+        self.l2_reg_lambda = 0.0000     #l2范数的学习率
         self.num_checkpoints = 100  # 打印的频率
         self.dropout=1.0               #dropout比例
         self.mode_learning_rate = 5e-4
@@ -31,6 +31,28 @@ class TextRNN(object):
         self.is_train = tf.placeholder(tf.bool)  # batchnormalization用
 
         self.buildModel()
+
+    def batch_norm(self,x, train, eps=1e-05, decay=0.9, affine=True, name=None):
+        from tensorflow.python.training.moving_averages import assign_moving_average
+        with tf.variable_scope(name, default_name='BatchNorm2d'):
+            params_shape = x.shape[-1:]
+            moving_mean = tf.get_variable('mean', params_shape, initializer=tf.zeros_initializer,trainable=False)  # moving两个变量永久保存，供测试时候使用
+            moving_variance = tf.get_variable('variance', params_shape, initializer=tf.ones_initializer,trainable=False)
+
+            def mean_var_with_update():
+                mean, variance = tf.nn.moments(x, [i for i in range(len(x.shape)-1)], name='moments')  # 求当前batch的平均值和标准差
+                # control_dependencies通常与with一起用，当with代码块中语句为tensorflow op操作时，确保先执行con里边的语句，如果不是op操作，只是单纯的tensor取值，则不执行
+                with tf.control_dependencies([assign_moving_average(moving_mean, mean, decay),assign_moving_average(moving_variance, variance,decay)]):  # 求滑动平均值，赋值给moving两个变量
+                    return tf.identity(mean), tf.identity(variance)  # 将当前batch的平均值和标准差返回，当需要y=x这种赋值操作时，使用y=tf.identity(x)
+
+            mean, variance = tf.cond(train, mean_var_with_update,lambda: (moving_mean, moving_variance))  # if else ，train为真时，返回第二个参数，假时返回第三个参数
+            if affine:
+                beta = tf.get_variable('beta', params_shape, initializer=tf.zeros_initializer)  #
+                gamma = tf.get_variable('gamma', params_shape, initializer=tf.ones_initializer)
+                x = tf.nn.batch_normalization(x, mean, variance, beta, gamma, eps)
+            else:
+                x = tf.nn.batch_normalization(x, mean, variance, None, None, eps)
+            return x
 
     def buildModel(self):
         if self.vocab_size!=0:
@@ -61,14 +83,30 @@ class TextRNN(object):
             outputs,_=tf.nn.bidirectional_dynamic_rnn(lstm_fw_cell,lstm_bw_cell,embedded_chars,dtype=tf.float32,scope="LSTM_1") #[batch_size,sequence_length,hidden_size] #creates a dynamic bidirectional recurrent neural network
             output_rnn = tf.concat(outputs, axis=2)  # [batch_size,sequence_length,hidden_size*2]
 
-        output_rnn=tf.expand_dims(output_rnn,-1)
-        pooled = tf.nn.max_pool(output_rnn, ksize=[1, self.sequence_length, 1, 1], strides=[1, 1, 1, 1],padding='VALID', name="pool")
-        pooled=tf.reshape(pooled,[-1,self.hidden_size*2])
+        temp=tf.split(output_rnn,self.sequence_length,1)
+        shit=tf.reshape(temp[self.sequence_length-1],[-1,self.hidden_size*2])
+        shit=self.batch_norm(shit,self.is_train,name='bn1')
+
+        w_projection = tf.get_variable("weight1", shape=[self.hidden_size * 2, self.hidden_size * 2],
+                                       initializer=init_value)  # [embed_size,label_size]
+        b_projection = tf.get_variable("bias1", shape=[self.hidden_size * 2])  # [label_size]
+        shit1 = tf.nn.relu(tf.matmul(shit, w_projection) + b_projection)  # [batch_size,num_classes]
+        shit2=self.batch_norm(shit1,self.is_train,name='bn2')
+
+        w_projection = tf.get_variable("weight2", shape=[self.hidden_size * 2, self.hidden_size * 2],
+                                       initializer=init_value)  # [embed_size,label_size]
+        b_projection = tf.get_variable("bias2", shape=[self.hidden_size * 2])  # [label_size]
+        shit2 = tf.nn.relu(tf.matmul(shit1, w_projection) + b_projection)  # [batch_size,num_classes]
+        shit3=self.batch_norm(shit2, self.is_train, name='bn3')
+
+        # output_rnn=tf.expand_dims(output_rnn,-1)
+        # pooled = tf.nn.max_pool(output_rnn, ksize=[1, self.sequence_length, 1, 1], strides=[1, 1, 1, 1],padding='VALID', name="pool")
+        # pooled=tf.reshape(shit3,[-1,self.hidden_size*2])
 
         with tf.name_scope("output"):  # inputs: A `Tensor` of shape `[batch_size, dim]`.  The forward activations of the input network.
             w_projection = tf.get_variable("w_projection", shape=[self.hidden_size * 2, self.num_classes],initializer=init_value)  # [embed_size,label_size]
             b_projection = tf.get_variable("bias_projection", shape=[self.num_classes])  # [label_size]
-            logits = tf.matmul(pooled, w_projection) + b_projection  # [batch_size,num_classes]
+            logits = tf.matmul(shit, w_projection) + b_projection  # [batch_size,num_classes]
             self.out = tf.nn.sigmoid(logits)
 
         # Calculate mean cross-entropy loss
@@ -231,7 +269,7 @@ class TextRNN(object):
                     print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                     print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, self.num_epochs, batchnum, batchmax))
 
-                if batchnum%30001==0 or (epochnum == self.num_epochs-1 and batchnum == batchmax // 2):
+                if batchnum%20001==0 or (epochnum == self.num_epochs-1 and batchnum == batchmax // 2):
                     p, r, f1 = self.testModel()
                     if f1 > f1_max:
                         f1_max = f1
