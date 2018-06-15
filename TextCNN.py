@@ -334,13 +334,22 @@ class TextCNN(object):
         self.data.init_evalution()
         dev_iter = self.data.dev_batch_iter(test_file=test_file)
 
+        arr1=[]
+        arr2=[]
         for x,y in dev_iter:
             feed_dict = {self.input_x: x, self.input_y: y, self.dropout_keep_prob: 1.0,self.is_train:False}
             summaries, out ,step= self.sess.run([self.dev_summary_op, self.out,self.global_step],feed_dict=feed_dict)
 
             for i in range(len(out)):
+                arr1.append(self.data.get_label_using_logits(out[i]))
+                arr2.append(self.data.get_target_label_short(y[i]))
                 self.data.evalution(out[i],y[i])
 
+        import pickle
+        with open('./shit1.pik', 'wb') as f:
+            pickle.dump(arr1,f)
+        with open('./shit2.pik', 'wb') as f:
+            pickle.dump(arr2,f)
         p, r, f1 = self.data.get_evalution_result()
 
         print("Evaluation: precision {:g}, recall {:g}, f1 {:g}".format(p, r, f1))
