@@ -17,7 +17,7 @@ class dataset(object):
         self.vx_num=0
         self.vx_size=200
         self.max_file_num=338
-        self.train_file_num=[0,0]
+        self.train_file_num=[0,10]
         self.test_file_num=[75,75]
 
         self.mode=mode
@@ -66,15 +66,8 @@ class dataset(object):
                     Y.append(y)
                 yield X,Y,k+(i-self.train_file_num[0])*tempnum+1,tempnum*(self.train_file_num[1]-self.train_file_num[0]+1)
 
-    def dev_batch_iter(self,batch_size=50,test_file=None):
-        if test_file!=None:
-            left=test_file[0]
-            right=test_file[1]+1
-        else:
-            left=self.test_file_num[0]
-            right=self.test_file_num[1]+1
-
-        for i in range(left,right):
+    def dev_batch_iter(self,batch_size=50):
+        for i in range(self.test_file_num[0],self.test_file_num[1]+1):
             with open(self.train_data_x_dir + '%d' % i, 'rb') as f:
                 temp_data_x=pickle.load(f)
             with open(self.train_data_y_dir + '%d' % i, 'rb') as f:
@@ -94,7 +87,7 @@ class dataset(object):
                     y = self.process_Y(self.temp_data_y[j])
                     X.append(x)
                     Y.append(y)
-                yield X,Y
+                yield X,Y,k,tempnum
 
             del self.temp_data_y
 
@@ -110,13 +103,13 @@ class dataset(object):
         return p, r, f1
 
     def evalution(self,logits, label):      #计算微平均
-        label_list = self.get_label_using_logits(logits,top_number=5)
+        label_list = self.get_label_using_logits(logits)
         # eval_y_short = self.get_target_label_short(label)
         eval_y_short=self.temp_data_y[self.index]
         self.index+=1
         num_correct_label = 0
 
-        for i,label_predict in enumerate(label_list):
+        for label_predict in label_list:
             if label_predict in eval_y_short:
                 num_correct_label += 1
 

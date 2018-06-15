@@ -23,9 +23,9 @@ class TextCNN(object):
         self.l2_reg_lambda = 0.0000  # l2范数的学习率
         self.mode_learning_rate = 5e-4
         self.embed_learning_rate = 2e-4
-        self.num_checkpoints=50       #打印的频率
+        self.num_checkpoints=100       #打印的频率
         self.dropout=0.5               #dropout比例
-        self.batch_size=50
+        self.batch_size=100
         self.num_epochs = 10            #总的训练次数
         self.Model_dir = "TextCNN"  # 模型参数默认保存位置
 
@@ -307,18 +307,18 @@ class TextCNN(object):
 
             # 结束一轮训练后，测试
             p, r, f1 = self.testModel()
-            if f1 > f1_max:
-                f1_max = f1
-                self.saveModel()
-                print("saved")
-            else:
-                self.loadModel()
+            # if f1 > f1_max:
+            #     f1_max = f1
+            #     self.saveModel()
+            #     print("saved")
+            # else:
+            #     self.loadModel()
 
             str = "\n第%d轮训练结束\n时间 : " % (epochnum + 1)
             str += datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             str += '\np : %f , r : %f , f1 : %f\n' % (p, r, f1)
             self.write_log_infomation(str)
-            train_num += 1
+            # train_num += 1
 
             if train_num < self.num_epochs:
                 train_op_chioce = self.train_op_array[train_num]
@@ -330,26 +330,17 @@ class TextCNN(object):
 
         self.write_log_infomation('\n最大F值为 : %f' % f1_max)
 
-    def testModel(self,test_file=None):
+    def testModel(self):
         self.data.init_evalution()
-        dev_iter = self.data.dev_batch_iter(test_file=test_file)
+        dev_iter = self.data.dev_batch_iter()
 
-        arr1=[]
-        arr2=[]
-        for x,y in dev_iter:
+        for x,y,a,b in dev_iter:
             feed_dict = {self.input_x: x, self.input_y: y, self.dropout_keep_prob: 1.0,self.is_train:False}
             summaries, out ,step= self.sess.run([self.dev_summary_op, self.out,self.global_step],feed_dict=feed_dict)
 
             for i in range(len(out)):
-                arr1.append(self.data.get_label_using_logits(out[i]))
-                arr2.append(self.data.get_target_label_short(y[i]))
                 self.data.evalution(out[i],y[i])
 
-        import pickle
-        with open('./shit1.pik', 'wb') as f:
-            pickle.dump(arr1,f)
-        with open('./shit2.pik', 'wb') as f:
-            pickle.dump(arr2,f)
         p, r, f1 = self.data.get_evalution_result()
 
         print("Evaluation: precision {:g}, recall {:g}, f1 {:g}".format(p, r, f1))
