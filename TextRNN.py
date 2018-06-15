@@ -96,7 +96,7 @@ class TextRNN(object):
         w_projection = tf.get_variable("weight2", shape=[self.hidden_size * 2, self.hidden_size * 2],
                                        initializer=init_value)  # [embed_size,label_size]
         b_projection = tf.get_variable("bias2", shape=[self.hidden_size * 2])  # [label_size]
-        shit2 = tf.nn.relu(tf.matmul(shit1, w_projection) + b_projection)  # [batch_size,num_classes]
+        shit2 = tf.nn.relu(tf.matmul(shit2, w_projection) + b_projection)  # [batch_size,num_classes]
         shit3=self.batch_norm(shit2, self.is_train, name='bn3')
 
         # output_rnn=tf.expand_dims(output_rnn,-1)
@@ -106,7 +106,7 @@ class TextRNN(object):
         with tf.name_scope("output"):  # inputs: A `Tensor` of shape `[batch_size, dim]`.  The forward activations of the input network.
             w_projection = tf.get_variable("w_projection", shape=[self.hidden_size * 2, self.num_classes],initializer=init_value)  # [embed_size,label_size]
             b_projection = tf.get_variable("bias_projection", shape=[self.num_classes])  # [label_size]
-            logits = tf.matmul(shit, w_projection) + b_projection  # [batch_size,num_classes]
+            logits = tf.matmul(shit3, w_projection) + b_projection  # [batch_size,num_classes]
             self.out = tf.nn.sigmoid(logits)
 
         # Calculate mean cross-entropy loss
