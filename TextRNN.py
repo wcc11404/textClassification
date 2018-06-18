@@ -21,9 +21,9 @@ class TextRNN(object):
         self.l2_reg_lambda = 0.0000     #l2范数的学习率
         self.num_checkpoints = 100  # 打印的频率
         self.dropout=1.0               #dropout比例
-        self.mode_learning_rate = 5e-4
+        self.mode_learning_rate = 5e-3
         self.embed_learning_rate = 2e-4
-        self.batch_size=50
+        self.batch_size=100
         self.num_epochs = 10            #总的训练次数
         self.Model_dir = "TextRNN"  # 模型参数默认保存位置
 
@@ -216,7 +216,7 @@ class TextRNN(object):
                     print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                     print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, self.num_epochs, batchnum, batchmax))
 
-                if batchnum%4001==0 or (epochnum == self.num_epochs-1 and batchnum == batchmax // 2):
+                if batchnum % 15001==0 or (epochnum == self.num_epochs-1 and batchnum == batchmax // 2):
                     p, r, f1 = self.testModel()
                     if f1 > f1_max:
                         f1_max = f1

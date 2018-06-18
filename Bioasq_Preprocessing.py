@@ -22,8 +22,8 @@ if desktop==1:
     f_in_name="D:/wang/"
     f_out_name=f_in_name+"out/"
 elif desktop==2:
-    f_in_name="E:/D盘数据备份/"
-    f_out_name="D:/bioasq2018/"
+    f_in_name="D:/bioasq2018/"
+    f_out_name="E:/D盘数据备份/out/"
 
 def process_line(line):
     line=line[11:-1]
@@ -190,6 +190,7 @@ def process_title_abstract(abstract,title,map,cache_embed):
             break
 
     length = max_title_length + max_abstract_length - len(array)
+    # length = max_abstract_length - len(array)
     for i in range(length):
         n = cache_embed['zero_embed']
         array.append(n)  # 补齐字符
