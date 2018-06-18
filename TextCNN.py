@@ -14,14 +14,14 @@ class TextCNN(object):
         self.sequence_length,self.num_classes,self.vocab_size,self.embedding_size=self.data.get_param()
 
         self.filter_sizes=[1,3,5,7,9]       #cnn    filter大小,kernel为[filter,embedding_size]
-        self.num_filters=400            #cnn    filter数量
+        self.num_filters=300            #cnn    filter数量
 
         # self.decay_steps = 2500
         # self.decay_rate = 0.65
         #self.learning_rate = tf.Variable(1e-3, trainable=False, name="learning_rate")  # ADD learning_rate
 
         self.l2_reg_lambda = 0.0000  # l2范数的学习率
-        self.mode_learning_rate = 5e-4
+        self.mode_learning_rate = 1e-3
         self.embed_learning_rate = 2e-4
         self.num_checkpoints=100       #打印的频率
         self.dropout=0.5               #dropout比例
@@ -55,15 +55,28 @@ class TextCNN(object):
                 x = tf.nn.batch_normalization(x, mean, variance, None, None, eps)
             return x
 
-    def convolution_batchnormalization(self,input,shape,scope,strides=[1,1,1,1],padding="SAME",init=tf.truncated_normal_initializer(stddev=0.1)):
+    def convolution(self,input,shape,scope,strides=[1,1,1,1],padding="SAME",init=tf.truncated_normal_initializer(stddev=0.1),is_bn=True):
         with tf.variable_scope(scope):
             w=tf.get_variable("weight_conv",shape,tf.float32,init)
             b=tf.get_variable("bias_conv",[shape[3]],tf.float32,tf.constant_initializer(0.1))
             conv=tf.nn.conv2d(input,w,strides,padding)
             #tf.nn.convolution(dilation_rate)
-            conv=self.batch_norm(conv,self.is_train,name=scope)
-            conv=tf.nn.relu(tf.nn.bias_add(conv,b))
+            conv=tf.nn.bias_add(conv, b)
+            if is_bn:
+                conv=self.batch_norm(conv,self.is_train,name='bn')
+            conv=tf.nn.relu(conv)
             return conv
+
+    def liner(self,input,outputshape,scope,init=tf.truncated_normal_initializer(stddev=0.1),is_bn=True):
+        shape=int(input.shape[1])
+        with tf.variable_scope(scope):
+            w = tf.get_variable("weight_line", [shape, outputshape], tf.float32, init)
+            b = tf.get_variable("bias_line", [outputshape], tf.float32, tf.constant_initializer(0.1))
+            line = tf.matmul(input, w) + b
+            if is_bn:
+                line = self.batch_norm(line, self.is_train, name='bn')
+            line = tf.nn.relu(line)
+            return line
 
     def buildModel(self):
         if self.vocab_size!=0:
@@ -91,11 +104,11 @@ class TextCNN(object):
 
                 # Convolution Layer1
                 filter_shape = [filter_size, self.embedding_size, 1, self.num_filters//2]
-                conv1=self.convolution_batchnormalization(embedded_chars_expanded,filter_shape,'conv%d_1' % i,padding='VALID')
+                conv1=self.convolution(embedded_chars_expanded,filter_shape,'conv%d_1' % i,padding='VALID')
 
                 # Convolution Layer2
                 filter_shape1 = [filter_size, 1, self.num_filters//2, self.num_filters]
-                conv2=self.convolution_batchnormalization(conv1,filter_shape1,'conv%d_2' %i,padding='VALID')
+                conv2=self.convolution(conv1,filter_shape1,'conv%d_2' %i,padding='VALID')
 
                 # Maxpooling over the outputs
                 pooled = tf.nn.max_pool(conv2,ksize=[1, self.sequence_length - 2*filter_size + 2, 1, 1],strides=[1, 1, 1, 1],padding='VALID',name="pool_%d" % i)
@@ -105,6 +118,7 @@ class TextCNN(object):
         num_filters_total = self.num_filters * len(self.filter_sizes)
         h_pool = tf.concat(pooled_outputs, 3)
         h_pool_flat = tf.reshape(h_pool, [-1, num_filters_total])
+        # h_pool_flat = self.batch_norm(h_pool_flat,self.is_train,name='bn0')
 
         # Add dropout
         # with tf.name_scope("dropout"):
@@ -112,17 +126,17 @@ class TextCNN(object):
 
         with tf.name_scope("liner"):
             if self.num_classes>3000:
-                w2 = tf.Variable(tf.truncated_normal([num_filters_total, self.num_classes], stddev=0.1),
-                                 name='weight_line_2')
-                b2 = tf.Variable(tf.constant(0.1, shape=[self.num_classes]), name='bias_liner_2')
-                liner_out2 = tf.matmul(h_pool_flat, w2) + b2
+                line=self.liner(h_pool_flat,num_filters_total,'line1')
+
+                line=self.liner(line,num_filters_total,'line2')
+
+                w3 = tf.Variable(tf.truncated_normal([num_filters_total, self.num_classes], stddev=0.1),
+                                 name='weight_line_3')
+                b3 = tf.Variable(tf.constant(0.1, shape=[self.num_classes]), name='bias_liner_3')
+                liner_out2 = tf.matmul(line, w3) + b3
             else:
                 temp_num=(num_filters_total+self.num_classes)//2
-                w1 = tf.Variable(tf.truncated_normal([num_filters_total, temp_num],stddev=0.1), name='weight_line_1')
-                b1 = tf.Variable(tf.constant(0.1, shape=[temp_num]), name='bias_liner_1')
-                liner_out=tf.matmul(h_pool_flat,w1)+b1
-                liner_out=self.batch_norm(liner_out,self.is_train,name='bn_liner_1')
-                liner_out=tf.nn.relu(liner_out)
+                liner_out=self.liner(h_pool_flat,temp_num,'line1')
 
                 w2 = tf.Variable(tf.truncated_normal([temp_num, self.num_classes],stddev=0.1), name='weight_line_2')
                 b2 = tf.Variable(tf.constant(0.1, shape=[self.num_classes]), name='bias_liner_2')
@@ -142,21 +156,7 @@ class TextCNN(object):
 
         # Define Training procedure
         self.global_step = tf.Variable(0, name="global_step", trainable=False)
-        ##########################################  简版训练op  #################################################
-        # if self.mode==1:
-        #     learning_rate = tf.train.exponential_decay(self.learning_rate, self.global_step, self.decay_steps,
-        #                                                self.decay_rate, staircase=True)
-        #     optimizer = tf.train.AdamOptimizer(learning_rate)
-        #
-        #     var_expect_embedding=[v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
-        #     grads_and_vars = optimizer.compute_gradients(self.loss,var_list=var_expect_embedding)
-        #     self.train_op = optimizer.apply_gradients(grads_and_vars, global_step=self.global_step)
-        #
-        #     # optimizer1 = tf.train.AdamOptimizer(learning_rate)
-        #     grads_and_vars1=optimizer.compute_gradients(self.loss)
-        #     self.train_op1 = optimizer.apply_gradients(grads_and_vars1, global_step=self.global_step)
-        # ##########################################################################################################
-        # elif self.mode==2:
+
         var_expect_embedding = [v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
         train_adamop_array=[]
         learning_rate_temp = self.mode_learning_rate
@@ -221,49 +221,7 @@ class TextCNN(object):
         self.dev_summary_writer = tf.summary.FileWriter(dev_summary_dir, self.sess.graph)
 
     def trainModel(self,num_epoch=10):
-        # if self.mode==1:
-        #     self.trainModel1(num_epoch)
-        # elif self.mode==2:
         self.trainModel2()
-
-    def trainModel1(self,num_epoch=10):
-        train_op_chioce=self.train_op
-        f1_max=0.0
-
-        print("start training")
-        self.starttime = datetime.datetime.now()
-
-        for epochnum in range(num_epoch):
-            batches = self.data.train_batch_iter(self.batch_size, num_epoch)  # batch迭代器
-
-            if epochnum>0:
-                train_op_chioce=self.train_op1
-
-            for x_batch,y_batch,batchnum,batchmax in batches:                                 #通过迭代器取出batch数据
-                self.sess.graph.finalize()
-                feed_dict = {self.input_x: x_batch, self.input_y: y_batch, self.dropout_keep_prob: self.dropout,self.is_train:True}
-                _, summaries, loss ,step= self.sess.run([train_op_chioce, self.train_summary_op, self.loss,self.global_step], feed_dict=feed_dict)
-                self.train_summary_writer.add_summary(summaries, step)  # 对记录文件添加上边run出的记录和step数
-
-                if ((step - 1) % self.num_checkpoints == 0):
-                    print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-                    print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, num_epoch, batchnum, batchmax))
-
-                if ((step - 1) and (step - 1) % self.num_test == 0):
-                    p,r,f1=self.testModel()
-                    if f1>f1_max:
-                        f1_max=f1
-                        self.saveModel()
-                        f = open("./" + self.Model_dir + '/info.txt', 'w')
-                        time = datetime.datetime.now()
-                        str = '第%d轮训练用时%ds\n' % (epochnum + 1, (time - self.starttime).seconds)
-                        str += 'p_5 : %f , r_5 : %f , f1 : %f\n' % (p, r, f1)
-                        f.write(str)
-                        f.close()
-                        print("saved")
-
-            print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            print('epoch %d finish' % (epochnum+1))
 
     def trainModel2(self):
         train_num = 0
@@ -294,7 +252,7 @@ class TextCNN(object):
                     print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                     print('epoch:%d/%d\tbatch:%d/%d\tloss:%f' % (epochnum, self.num_epochs, batchnum, batchmax,loss))
 
-                if batchnum%20001==0 or (epochnum == self.num_epochs-1 and batchnum == batchmax // 2):
+                if batchnum % 4001 == 0 or (epochnum == self.num_epochs-1 and batchnum == batchmax // 2):
                     p, r, f1 = self.testModel()
                     # if f1 > f1_max:
                     #     f1_max = f1
@@ -307,10 +265,10 @@ class TextCNN(object):
 
             # 结束一轮训练后，测试
             p, r, f1 = self.testModel()
-            # if f1 > f1_max:
-            #     f1_max = f1
-            #     self.saveModel()
-            #     print("saved")
+            if f1 > f1_max:
+                f1_max = f1
+                self.saveModel()
+                print("saved")
             # else:
             #     self.loadModel()
 
@@ -334,7 +292,7 @@ class TextCNN(object):
         self.data.init_evalution()
         dev_iter = self.data.dev_batch_iter()
 
-        for x,y,a,b in dev_iter:
+        for x,y in dev_iter:
             feed_dict = {self.input_x: x, self.input_y: y, self.dropout_keep_prob: 1.0,self.is_train:False}
             summaries, out ,step= self.sess.run([self.dev_summary_op, self.out,self.global_step],feed_dict=feed_dict)
 

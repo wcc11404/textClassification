@@ -17,33 +17,41 @@ embedding_size=200
 max_train_data=13486072
 label_num=28340
 max_abstract_perfile=40000
-desktop=1
+desktop=2
 if desktop==1:
     f_in_name="D:/wang/"
     f_out_name=f_in_name+"out/"
 elif desktop==2:
-    f_in_name="D:/bioasq2018/"
-    f_out_name="E:/D盘数据备份/out/"
+    f_in_name="E:/D盘数据备份/"
+    f_out_name="D:/bioasq2018/"
 
 def process_line(line):
-    line=line.split("\":")
-    dict={}
+    line=line[11:-1]
+    dict = {}
 
-    # dict['journal']=line[1][1:-12]
+    line=line.split("\",\"meshMajor\":[\"")
+    dict['journal']=line[0]
 
-    t=line[2][2:-8]
-    dict['meshMajor']=list(t.split("\",\""))
+    line=line[1].split("\"],\"year\":")
+    dict['meshMajor']=list(line[0].split("\",\""))
 
-    # if line[3][0]=='\"':
-    #     dict['year'] = line[3][1:-15]
-    # else:
-    #     dict['year'] = line[3][0:-15]
+    if line[1][0]=='\"':
+        line=line[1].split('\",\"abstractText\":\"')
+        dict['year'] = line[0][1:]
+    elif line[1][0]=='n':
+        line = line[1].split(',\"abstractText\":\"')
+        dict['year'] = line[0]
 
-    dict['abstractText']=line[4][1:-7]
+    line=line[1].split('\",\"pmid\":\"')
+    dict['abstractText']=line[0]
 
-    # dict['pmid']=line[5][1:-8]
+    line=line[1].split('\",\"title\":')
+    dict['pmid']=line[0]
 
-    dict['title']=line[6][1:-1]
+    if line[1][0]=='\"':
+        dict['title']=line[1][1:-1]
+    else:
+        dict['title']=line[1]
 
     return dict
 
@@ -53,7 +61,7 @@ def getLineIter():
         str = f.readline()
         line_num=0
         while str != '':
-            str = str.strip()[1:-2]
+            str = str.strip()[1:-1]
             try:
                 dict = process_line(str)
                 # print(dict)
@@ -110,6 +118,8 @@ def all_abstract_word():
     f1=open(f_in_name+'allMeSH_2018_process_title.txt',mode='w',encoding='utf-8')
     for line, num in iter:
         title = line['title']
+        if title=='null':
+            title=''
         title_temp=word_tokenize(title.lower())
         title_temp=[word for word in title_temp if word not in list_stopwords and word not in ttt]
 
@@ -131,7 +141,7 @@ def all_abstract_word():
         f1.write(str)
 
         if num%5000==0:
-            print('finished %f%%'% (num/max_train_data*100))
+            print('finished %f%%' % (num/max_train_data*100))
 
     f.close()
     f1.close()
@@ -221,7 +231,7 @@ def process_abstract_main():
     abstract_array = []
     File_num = 0
     for line_abstract, line_title, num in iter:
-        line_abstract = line_abstract[:-1].strip().split(' ')
+        line_abstract = line_abstract[:-1].strip().split(' ')   #-1是为了去除最后一个\n字符
         line_title = line_title[:-1].strip().split(' ')
         title_abstract = process_title_abstract(line_abstract, line_title, map, cache_embed)
         abstract_array.append(title_abstract)
@@ -270,7 +280,7 @@ def process_meshMajor():
     else:
         shutil.rmtree(f_out_name + 'train_data_y')
         os.makedirs(f_out_name + 'train_data_y')
-    # print(len(label_map))#28340
+    print(len(label_map))#28340
 
     iter = getLineIter()
     File_num = 0
@@ -350,7 +360,7 @@ def hist_title_abstract():
     with open(f_in_name + 'model/abstract_len.pik', 'rb') as data_f:
         abstract_len=pickle.load(data_f)
 
-    temp=abstract_len
+    temp=title_len
     max_len=0
     min_len=500
     sum=0
@@ -382,7 +392,7 @@ def hist_MeshMajor():
 
 def main():
     # process_meshMajor_main() #预统计label信息，存储label编码模型
-    # process_meshMajor()      #替换所有label为其编码，并分批存储成pickle
+    process_meshMajor()      #替换所有label为其编码，并分批存储成pickle
 
     # readEmbedding()          #预统计embedding信息，存储embedding模型，map['word']='str'形式
     # all_abstract_word()        #预统计所有title和abstract的单词信息，分词，去除停用词，标点符号，存储到文件，并用counter统计，存储处理后的word
@@ -390,7 +400,7 @@ def main():
 
     # load_xydata0()           #测试读取xy数据后内存占用大小
     # hist_title_abstract()       #观察title和abstract长度直方图
-    hist_MeshMajor()            #观察标签数量直方图
+    # hist_MeshMajor()            #观察标签数量直方图
 
 if __name__ == '__main__':
     main()

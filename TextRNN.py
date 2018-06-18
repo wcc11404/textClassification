@@ -54,6 +54,17 @@ class TextRNN(object):
                 x = tf.nn.batch_normalization(x, mean, variance, None, None, eps)
             return x
 
+    def liner(self,input,outputshape,scope,init=tf.truncated_normal_initializer(stddev=0.1),is_bn=True):
+        shape=int(input.shape[1])
+        with tf.variable_scope(scope):
+            w = tf.get_variable("weight_line", [shape, outputshape], tf.float32, init)
+            b = tf.get_variable("bias_line", [outputshape], tf.float32, tf.constant_initializer(0.1))
+            line = tf.matmul(input, w) + b
+            if is_bn:
+                line = self.batch_norm(line, self.is_train, name='bn')
+            line = tf.nn.relu(line)
+            return line
+
     def buildModel(self):
         if self.vocab_size!=0:
             self.input_x = tf.placeholder(tf.int32, [None, self.sequence_length], name="input_x")
@@ -74,8 +85,8 @@ class TextRNN(object):
         with tf.name_scope("RNN"):
             lstm_fw_cell = tf.contrib.rnn.BasicLSTMCell(self.hidden_size) # forward direction cell
             lstm_bw_cell = tf.contrib.rnn.BasicLSTMCell(self.hidden_size)  # backward direction cell
-            mlstm_fw_cell = rnn.MultiRNNCell([lstm_fw_cell]*2,state_is_tuple=True)
-            mlstm_bw_cell = rnn.MultiRNNCell([lstm_bw_cell]*2,state_is_tuple=True)
+            # mlstm_fw_cell = rnn.MultiRNNCell([lstm_fw_cell]*2,state_is_tuple=True)
+            # mlstm_bw_cell = rnn.MultiRNNCell([lstm_bw_cell]*2,state_is_tuple=True)
             # if self.dropout_keep_prob is not None:
             #     lstm_fw_cell = tf.contrib.rnn.DropoutWrapper(lstm_fw_cell, output_keep_prob=self.dropout_keep_prob)
             #     lstm_bw_cell = tf.contrib.rnn.DropoutWrapper(lstm_bw_cell, output_keep_prob=self.dropout_keep_prob)
@@ -84,20 +95,12 @@ class TextRNN(object):
             output_rnn = tf.concat(outputs, axis=2)  # [batch_size,sequence_length,hidden_size*2]
 
         temp=tf.split(output_rnn,self.sequence_length,1)
-        shit=tf.reshape(temp[self.sequence_length-1],[-1,self.hidden_size*2])
-        shit=self.batch_norm(shit,self.is_train,name='bn1')
+        out=tf.reshape(temp[self.sequence_length-1],[-1,self.hidden_size*2])
+        out=self.batch_norm(out,self.is_train,name='bn1')
 
-        w_projection = tf.get_variable("weight1", shape=[self.hidden_size * 2, self.hidden_size * 2],
-                                       initializer=init_value)  # [embed_size,label_size]
-        b_projection = tf.get_variable("bias1", shape=[self.hidden_size * 2])  # [label_size]
-        shit1 = tf.nn.relu(tf.matmul(shit, w_projection) + b_projection)  # [batch_size,num_classes]
-        shit2=self.batch_norm(shit1,self.is_train,name='bn2')
+        out = self.liner(out, self.hidden_size * 2, 'line1')
 
-        w_projection = tf.get_variable("weight2", shape=[self.hidden_size * 2, self.hidden_size * 2],
-                                       initializer=init_value)  # [embed_size,label_size]
-        b_projection = tf.get_variable("bias2", shape=[self.hidden_size * 2])  # [label_size]
-        shit2 = tf.nn.relu(tf.matmul(shit2, w_projection) + b_projection)  # [batch_size,num_classes]
-        shit3=self.batch_norm(shit2, self.is_train, name='bn3')
+        out = self.liner(out, self.hidden_size * 2, 'line2')
 
         # output_rnn=tf.expand_dims(output_rnn,-1)
         # pooled = tf.nn.max_pool(output_rnn, ksize=[1, self.sequence_length, 1, 1], strides=[1, 1, 1, 1],padding='VALID', name="pool")
@@ -106,7 +109,7 @@ class TextRNN(object):
         with tf.name_scope("output"):  # inputs: A `Tensor` of shape `[batch_size, dim]`.  The forward activations of the input network.
             w_projection = tf.get_variable("w_projection", shape=[self.hidden_size * 2, self.num_classes],initializer=init_value)  # [embed_size,label_size]
             b_projection = tf.get_variable("bias_projection", shape=[self.num_classes])  # [label_size]
-            logits = tf.matmul(shit3, w_projection) + b_projection  # [batch_size,num_classes]
+            logits = tf.matmul(out, w_projection) + b_projection  # [batch_size,num_classes]
             self.out = tf.nn.sigmoid(logits)
 
         # Calculate mean cross-entropy loss
@@ -119,21 +122,7 @@ class TextRNN(object):
 
         # Define Training procedure
         self.global_step = tf.Variable(0, name="global_step", trainable=False)
-        ##########################################  简版训练op  #################################################
-        # if self.mode==1:
-        #     learning_rate = tf.train.exponential_decay(self.learning_rate, self.global_step, self.decay_steps,
-        #                                                self.decay_rate, staircase=True)
-        #     optimizer = tf.train.AdamOptimizer(learning_rate)
-        #
-        #     var_expect_embedding=[v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
-        #     grads_and_vars = optimizer.compute_gradients(self.loss,var_list=var_expect_embedding)
-        #     self.train_op = optimizer.apply_gradients(grads_and_vars, global_step=self.global_step)
-        #
-        #     # optimizer1 = tf.train.AdamOptimizer(learning_rate)
-        #     grads_and_vars1=optimizer.compute_gradients(self.loss)
-        #     self.train_op1 = optimizer.apply_gradients(grads_and_vars1, global_step=self.global_step)
-        # ##########################################################################################################
-        # elif self.mode==2:
+
         var_expect_embedding = [v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
         train_adamop_array = []
         learning_rate_temp = self.mode_learning_rate

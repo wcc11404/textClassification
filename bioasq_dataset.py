@@ -4,11 +4,11 @@ import scipy.sparse as sparse
 import datetime
 
 class dataset(object):
-    def __init__(self,mode=1,desktop=1):
+    def __init__(self,mode=1,desktop=2):
         if desktop==1:
             self.data_dir = "D:/wang/out/"
         elif desktop==2:
-            self.data_dir = "E:/D盘数据备份/out/"
+            self.data_dir = "D:/bioasq2018/"
         self.train_data_x_dir = self.data_dir + "train_data_x/data_"
         self.train_data_y_dir = self.data_dir + "train_data_y/data_"
 
@@ -17,7 +17,7 @@ class dataset(object):
         self.vx_num=0
         self.vx_size=200
         self.max_file_num=338
-        self.train_file_num=[0,10]
+        self.train_file_num=[0,74]
         self.test_file_num=[75,75]
 
         self.mode=mode
@@ -87,7 +87,7 @@ class dataset(object):
                     y = self.process_Y(self.temp_data_y[j])
                     X.append(x)
                     Y.append(y)
-                yield X,Y,k,tempnum
+                yield X,Y
 
             del self.temp_data_y
 
