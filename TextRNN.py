@@ -186,49 +186,7 @@ class TextRNN(object):
         self.dev_summary_writer = tf.summary.FileWriter(dev_summary_dir, self.sess.graph)
 
     def trainModel(self,num_epoch=10):
-        # if self.mode==1:
-        #     self.trainModel1(num_epoch)
-        # elif self.mode==2:
         self.trainModel2()
-
-    def trainModel1(self,num_epoch=10):
-        train_op_chioce=self.train_op
-        f1_max=0.0
-
-        print("start training")
-        self.starttime = datetime.datetime.now()
-
-        for epochnum in range(num_epoch):
-            batches = self.data.train_batch_iter(self.batch_size, num_epoch)  # batch迭代器
-
-            if epochnum>0:
-                train_op_chioce=self.train_op1
-
-            for x_batch,y_batch,batchnum,batchmax in batches:                                 #通过迭代器取出batch数据
-                self.sess.graph.finalize()
-                feed_dict = {self.input_x: x_batch, self.input_y: y_batch, self.dropout_keep_prob: self.dropout,self.is_train:True}
-                _, summaries, loss ,step= self.sess.run([train_op_chioce, self.train_summary_op, self.loss,self.global_step], feed_dict=feed_dict)
-                self.train_summary_writer.add_summary(summaries, step)  # 对记录文件添加上边run出的记录和step数
-
-                if ((step - 1) % self.num_checkpoints == 0):
-                    print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-                    print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, num_epoch, batchnum, batchmax))
-
-                if ((step - 1) and (step - 1) % self.num_test == 0):
-                    p,r,f1=self.testModel()
-                    if f1>f1_max:
-                        f1_max=f1
-                        self.saveModel()
-                        f = open("./" + self.Model_dir + '/info.txt', 'w')
-                        time = datetime.datetime.now()
-                        str = '第%d轮训练用时%ds\n' % (epochnum + 1, (time - self.starttime).seconds)
-                        str += 'p_5 : %f , r_5 : %f , f1 : %f\n' % (p, r, f1)
-                        f.write(str)
-                        f.close()
-                        print("saved")
-
-            print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            print('epoch %d finish' % (epochnum+1))
 
     def trainModel2(self):
         train_num = 0
@@ -258,7 +216,7 @@ class TextRNN(object):
                     print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                     print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, self.num_epochs, batchnum, batchmax))
 
-                if batchnum%20001==0 or (epochnum == self.num_epochs-1 and batchnum == batchmax // 2):
+                if batchnum%4001==0 or (epochnum == self.num_epochs-1 and batchnum == batchmax // 2):
                     p, r, f1 = self.testModel()
                     if f1 > f1_max:
                         f1_max = f1
