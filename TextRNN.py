@@ -216,7 +216,7 @@ class TextRNN(object):
 
                 if (batchnum % self.num_checkpoints == 0):
                     print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-                    print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, max_epochs, batchnum, batchmax))
+                    print('epoch:%d/%d\tbatch:%d/%d\tloss:%f' % (epochnum, max_epochs, batchnum, batchmax, loss))
 
                 if batchnum % 15001==0 or (epochnum == max_epochs-1 and batchnum == batchmax // 2):
                     p, r, f1 = self.testModel()
