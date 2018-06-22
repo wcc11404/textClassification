@@ -44,7 +44,7 @@ class dataset(object):
         result = sparse.csr_matrix((b, (a, y)), shape=(1, self.vy_num)).toarray().reshape((self.vy_num))
         return result
 
-    def train_batch_iter(self, batch_size):
+    def train_batch_iter(self, batch_size=50):
         # for epoch in range(num_epochs):
         for i in range(self.train_file_num[0],self.train_file_num[1]+1):
             with open(self.train_data_x_dir + '%d' % i, 'rb') as f:

@@ -198,8 +198,8 @@ class TextRNN(object):
         self.starttime = datetime.datetime.now()
         self.write_log_infomation("start time : " + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), True)
 
-        sum_num = self.num_optimizer * 3
-        for epochnum in range(sum_num):
+        max_epochs = self.num_optimizer * 4
+        for epochnum in range(max_epochs):
             batches = self.data.train_batch_iter(self.batch_size)  # batch迭代器
 
             for x_batch, y_batch, batchnum, batchmax in batches:  # 通过迭代器取出batch数据
@@ -216,9 +216,9 @@ class TextRNN(object):
 
                 if (batchnum % self.num_checkpoints == 0):
                     print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-                    print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, sum_num, batchnum, batchmax))
+                    print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, max_epochs, batchnum, batchmax))
 
-                if batchnum % 15001==0 or (epochnum == sum_num-1 and batchnum == batchmax // 2):
+                if batchnum % 15001==0 or (epochnum == max_epochs-1 and batchnum == batchmax // 2):
                     p, r, f1 = self.testModel()
                     # if f1 > f1_max:
                     #     f1_max = f1

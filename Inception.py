@@ -1,7 +1,7 @@
 import tensorflow as tf
 import datetime
-# from zhihu_sample_dataset import dataset
-from zhihu_dataset import dataset
+from bioasq_dataset import dataset
+# from zhihu_dataset import dataset
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
@@ -13,19 +13,13 @@ class Inception(object):
 
         self.sequence_length,self.num_classes,self.vocab_size,self.embedding_size=self.data.get_param()
 
-        # if self.mode==1:
-        #     self.decay_steps = 2500
-        #     self.decay_rate = 0.65
-        #     self.learning_rate = tf.Variable(1e-3, trainable=False, name="learning_rate")  # ADD learning_rate
-        #     self.num_test = 2500
-
         self.mode_learning_rate=1e-3
         self.embed_learning_rate = 2e-4
         self.num_checkpoints = 100      # 打印的频率
         self.l2_reg_lambda = 0.0001     #l2范数的学习率
         self.dropout=0.5               #dropout比例
         self.batch_size=100
-        self.num_epochs = 10
+        self.num_optimizer = 10
         self.Model_dir = "Inception"  # 模型参数默认保存位置
 
         self.is_train= tf.placeholder(tf.bool)
@@ -54,25 +48,33 @@ class Inception(object):
                 x = tf.nn.batch_normalization(x, mean, variance, None, None, eps)
             return x
 
-    def convolution_batchnormalization(self,input,shape,scope,strides=[1,1,1,1],padding="SAME",init=tf.truncated_normal_initializer(stddev=0.1)):
+    def convolution(self,input,shape,scope,strides=[1,1,1,1],padding="SAME",init=tf.truncated_normal_initializer(stddev=0.1),is_bn=True):
         with tf.variable_scope(scope):
             w=tf.get_variable("weight_conv",shape,tf.float32,init)
             b=tf.get_variable("bias_conv",[shape[3]],tf.float32,tf.constant_initializer(0.1))
             conv=tf.nn.conv2d(input,w,strides,padding)
-            conv=self.batch_norm(conv,self.is_train,name=scope)
-            conv=tf.nn.relu(tf.nn.bias_add(conv,b))
+            #tf.nn.convolution(dilation_rate)
+            conv=tf.nn.bias_add(conv, b)
+            if is_bn:
+                conv=self.batch_norm(conv,self.is_train,name='bn')
+            conv=tf.nn.relu(conv)
             return conv
 
-    def convolution(self,input,shape,scope,strides=[1,1,1,1],padding="SAME",init=tf.truncated_normal_initializer(stddev=0.1)):
+    def liner(self,input,outputshape,scope,init=tf.truncated_normal_initializer(stddev=0.1),is_bn=True):
+        shape=int(input.shape[1])
         with tf.variable_scope(scope):
-            w=tf.get_variable("weight_conv",shape,tf.float32,init)
-            conv=tf.nn.conv2d(input,w,strides,padding)
-            return conv
+            w = tf.get_variable("weight_line", [shape, outputshape], tf.float32, init)
+            b = tf.get_variable("bias_line", [outputshape], tf.float32, tf.constant_initializer(0.1))
+            line = tf.matmul(input, w) + b
+            if is_bn:
+                line = self.batch_norm(line, self.is_train, name='bn')
+            line = tf.nn.relu(line)
+            return line
 
     def reduction(self,input,scope="reduction"):
         shape_in = int(input.shape[3])
         with tf.variable_scope(scope):
-            branch_1 = self.convolution_batchnormalization(input, [3, 3, shape_in, shape_in], 'conv', [1, 2, 2, 1])
+            branch_1 = self.convolution(input, [3, 3, shape_in, shape_in], 'conv', [1, 2, 2, 1])
             branch_2 = tf.nn.max_pool(input, [1, 3, 3, 1], [1, 2, 2, 1], "SAME", name='max_pool')
             out=tf.concat([branch_1,branch_2],3)
         return out
@@ -92,17 +94,17 @@ class Inception(object):
         shape_out_3 = output_size * (output_proportion[2] / sum)
         shape_out_4 = output_size - shape_out_1 - shape_out_2 - shape_out_3
         with tf.variable_scope(scope):
-            branch_1=self.convolution_batchnormalization(input,[1,1,shape_in,shape_out_1],'conv1')
+            branch_1=self.convolution(input,[1,1,shape_in,shape_out_1],'conv1')
 
-            branch_2 = self.convolution_batchnormalization(input, [1, 1, shape_in, shape_out_2//2], 'conv2_1')
-            branch_2 = self.convolution_batchnormalization(branch_2, [max_size, max_size, shape_out_2//2, shape_out_2], 'conv2_2')
+            branch_2 = self.convolution(input, [1, 1, shape_in, shape_out_2 // 2], 'conv2_1')
+            branch_2 = self.convolution(branch_2, [max_size, max_size, shape_out_2 // 2, shape_out_2], 'conv2_2')
 
-            branch_3 = self.convolution_batchnormalization(input, [1, 1, shape_in, shape_out_3//2], 'conv3_1')
-            branch_3 = self.convolution_batchnormalization(branch_3, [max_size, max_size, shape_out_3//2, shape_out_3//2], 'conv3_2')
-            branch_3 = self.convolution_batchnormalization(branch_3, [max_size, max_size, shape_out_3//2, shape_out_3], 'conv3_3')
+            branch_3 = self.convolution(input, [1, 1, shape_in, shape_out_3 // 2], 'conv3_1')
+            branch_3 = self.convolution(branch_3, [max_size, max_size, shape_out_3 // 2, shape_out_3 // 2], 'conv3_2')
+            branch_3 = self.convolution(branch_3, [max_size, max_size, shape_out_3 // 2, shape_out_3], 'conv3_3')
 
             branch_4 = tf.nn.avg_pool(input, [1, 3, 3, 1], [1, 1, 1, 1], "SAME", name='avg_pool')
-            branch_4 = self.convolution_batchnormalization(branch_4, [1, 1, shape_in, shape_out_4], 'conv4')
+            branch_4 = self.convolution(branch_4, [1, 1, shape_in, shape_out_4], 'conv4')
 
             out=tf.concat([branch_1,branch_2,branch_3,branch_4],3)
         return out
@@ -122,20 +124,20 @@ class Inception(object):
         shape_out_3 = output_size * (output_proportion[2] / sum)
         shape_out_4 = output_size - shape_out_1 - shape_out_2 - shape_out_3
         with tf.variable_scope(scope):
-            branch_1=self.convolution_batchnormalization(input,[1,1,shape_in,shape_out_1],'conv1')
+            branch_1=self.convolution(input,[1,1,shape_in,shape_out_1],'conv1')
 
-            branch_2 = self.convolution_batchnormalization(input, [1, 1, shape_in, shape_out_2//2], 'conv2_1')
-            branch_2 = self.convolution_batchnormalization(branch_2, [1, max_size, shape_out_2 // 2, shape_out_2//2], 'conv2_2')
-            branch_2 = self.convolution_batchnormalization(branch_2, [max_size, 1, shape_out_2, shape_out_2], 'conv2_3')
+            branch_2 = self.convolution(input, [1, 1, shape_in, shape_out_2 // 2], 'conv2_1')
+            branch_2 = self.convolution(branch_2, [1, max_size, shape_out_2 // 2, shape_out_2 // 2], 'conv2_2')
+            branch_2 = self.convolution(branch_2, [max_size, 1, shape_out_2 // 2, shape_out_2], 'conv2_3')
 
-            branch_3 = self.convolution_batchnormalization(input, [1, 1, shape_in, shape_out_3//2], 'conv3_1')
-            branch_3 = self.convolution_batchnormalization(branch_3, [1, max_size, shape_out_3//2, shape_out_3//2], 'conv3_2')
-            branch_3 = self.convolution_batchnormalization(branch_3, [max_size, 1, shape_out_3 // 2, shape_out_3], 'conv3_3')
-            branch_3 = self.convolution_batchnormalization(branch_3, [1, max_size, shape_out_3, shape_out_3], 'conv3_4')
-            branch_3 = self.convolution_batchnormalization(branch_3, [max_size, 1, shape_out_3, shape_out_3], 'conv3_5')
+            branch_3 = self.convolution(input, [1, 1, shape_in, shape_out_3 // 2], 'conv3_1')
+            branch_3 = self.convolution(branch_3, [1, max_size, shape_out_3 // 2, shape_out_3 // 2], 'conv3_2')
+            branch_3 = self.convolution(branch_3, [max_size, 1, shape_out_3 // 2, shape_out_3], 'conv3_3')
+            branch_3 = self.convolution(branch_3, [1, max_size, shape_out_3, shape_out_3], 'conv3_4')
+            branch_3 = self.convolution(branch_3, [max_size, 1, shape_out_3, shape_out_3], 'conv3_5')
 
             branch_4 = tf.nn.avg_pool(input, [1, 3, 3, 1], [1, 1, 1, 1], "SAME", name='avg_pool')
-            branch_4 = self.convolution_batchnormalization(branch_4, [1, 1, shape_in, shape_out_4], 'conv4')
+            branch_4 = self.convolution(branch_4, [1, 1, shape_in, shape_out_4], 'conv4')
 
             out=tf.concat([branch_1,branch_2,branch_3,branch_4],3)
         return out
@@ -149,66 +151,60 @@ class Inception(object):
         self.dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
 
         # Embedding layer
-        init_value=tf.random_normal_initializer(stddev=0.1)
-        if self.vocab_size!=0:
-            with tf.name_scope("embedding"):
-                W = tf.Variable(self.data.load_vocabulary(),name="embedding_w")
-                embedded_chars = tf.nn.embedding_lookup(W, self.input_x)                                        #通过input_x查找对应字典的随机数
-        else:
-            embedded_chars=self.input_x
+        with tf.name_scope('embedding'):
+            init_value=tf.random_normal_initializer(stddev=0.1)
+            if self.vocab_size!=0:
+                with tf.name_scope("embedding"):
+                    W = tf.Variable(self.data.load_vocabulary(),name="embedding_w")
+                    embedded_chars = tf.nn.embedding_lookup(W, self.input_x)                                        #通过input_x查找对应字典的随机数
+            else:
+                embedded_chars=self.input_x
 
-        embedded_chars_expanded = tf.expand_dims(embedded_chars, -1)#将[none,56,128]后边加一维，变成[none,56,128,1]
+            embedded_chars_expanded = tf.expand_dims(embedded_chars, -1)#将[none,56,128]后边加一维，变成[none,56,128,1]
 
-        conv = self.convolution_batchnormalization(embedded_chars_expanded, [3, 3, 1, 32], 'conv111',strides=[1, 2, 2, 1])
-        conv = self.reduction(conv, 'reduction1')
-        conv = self.reduction(conv, 'reduction2')
-        conv = self.reduction(conv, 'reduction3')
-        out=self.inceptionA(conv)
-        out=tf.nn.max_pool(out,ksize=[1, int(out.shape[1]), 1, 1],strides=[1, 1, 1, 1],padding='VALID',name="pool")
-        temp=int(out.shape[1])*int(out.shape[2])*int(out.shape[3])
-        out=tf.reshape(out,[-1,temp])
+        with tf.name_scope('Inception'):
+            conv = self.convolution(embedded_chars_expanded, [3, 3, 1, 32], 'conv111',strides=[1, 2, 2, 1])
+            conv = self.reduction(conv, 'reduction1')
+            conv = self.reduction(conv, 'reduction2')
+            conv = self.reduction(conv, 'reduction3')
+            out=self.inceptionB(conv)
 
-        with tf.name_scope("dropout"):
-            out = tf.nn.dropout(out, self.dropout_keep_prob)
+        with tf.name_scope('pooling'):
+            out=tf.nn.max_pool(out,ksize=[1, int(out.shape[1]), 1, 1],strides=[1, 1, 1, 1],padding='VALID',name="pool")
+            temp=int(out.shape[1])*int(out.shape[2])*int(out.shape[3])
+            out=tf.reshape(out,[-1,temp])
+
+        # with tf.name_scope("dropout"):
+        #     out = tf.nn.dropout(out, self.dropout_keep_prob)
 
         with tf.name_scope("liner"):
-            w2 = tf.Variable(tf.truncated_normal([temp, self.num_classes], stddev=0.1),name='weight_line_2')
+            line = self.liner(out, temp // 2, 'line1')
+
+            line = self.liner(line, temp // 2, 'line2')
+
+            w2 = tf.Variable(tf.truncated_normal([temp // 2, self.num_classes], stddev=0.1), name='weight_line_2')
             b2 = tf.Variable(tf.constant(0.1, shape=[self.num_classes]), name='bias_liner_2')
-            liner_out2 = tf.matmul(out, w2) + b2
+            liner_out = tf.matmul(line, w2) + b2
 
         # Final (unnormalized) scores and predictions
         with tf.name_scope("output"):
-            self.out = tf.nn.sigmoid(liner_out2)
+            self.out = tf.nn.sigmoid(liner_out)
 
         # Calculate mean cross-entropy loss
         with tf.name_scope("loss"):
             l2_loss =tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name])
-            losses = tf.nn.sigmoid_cross_entropy_with_logits(logits=liner_out2, labels=self.input_y)
+            losses = tf.nn.sigmoid_cross_entropy_with_logits(logits=liner_out, labels=self.input_y)
             losses = tf.reduce_sum(losses,axis=1)
             losses = tf.reduce_mean(losses)
             self.loss=losses + self.l2_reg_lambda * l2_loss
 
         # Define Training procedure
         self.global_step = tf.Variable(0, name="global_step", trainable=False)
-        ##########################################  简版训练op  #################################################
-        # if self.mode==1:
-        #     learning_rate = tf.train.exponential_decay(self.learning_rate, self.global_step, self.decay_steps,
-        #                                                self.decay_rate, staircase=True)
-        #     optimizer = tf.train.AdamOptimizer(learning_rate)
-        #
-        #     var_expect_embedding=[v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
-        #     grads_and_vars = optimizer.compute_gradients(self.loss,var_list=var_expect_embedding)
-        #     self.train_op = optimizer.apply_gradients(grads_and_vars, global_step=self.global_step)
-        #
-        #     # optimizer1 = tf.train.AdamOptimizer(learning_rate)
-        #     grads_and_vars1=optimizer.compute_gradients(self.loss)
-        #     self.train_op1 = optimizer.apply_gradients(grads_and_vars1, global_step=self.global_step)
-        # ##########################################################################################################
-        # elif self.mode==2:
+
         var_expect_embedding = [v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
         train_adamop_array=[]
         learning_rate_temp=self.mode_learning_rate
-        for i in range(self.num_epochs):
+        for i in range(self.num_optimizer):
             train_adamop_array.append(tf.train.AdamOptimizer(learning_rate_temp))#.minimize(self.loss,global_step=self.global_step,var_list=var_expect_embedding))
             learning_rate_temp/=2.0
         var_embedding=[v for v in tf.trainable_variables() if 'embedding_w' in v.name]
@@ -219,7 +215,7 @@ class Inception(object):
         grads2=grads[len(var_expect_embedding):]
 
         self.train_op_array=[]
-        for i in range(self.num_epochs):
+        for i in range(self.num_optimizer):
             self.train_op_array.append(train_adamop_array[i].apply_gradients(zip(grads1, var_expect_embedding), global_step=self.global_step))
         if self.vocab_size != 0:
             self.train_embedding_op = train_embedding_adamop.apply_gradients(zip(grads2, var_embedding))
@@ -265,53 +261,7 @@ class Inception(object):
         dev_summary_dir = os.path.join(out_dir, "dev")
         self.dev_summary_writer = tf.summary.FileWriter(dev_summary_dir, self.sess.graph)
 
-    def trainModel(self,num_epoch=10):
-        # if self.mode==1:
-        #     self.trainModel1(num_epoch)
-        # elif self.mode==2:
-        self.trainModel2()
-
-    def trainModel1(self):
-
-        train_op_chioce=self.train_op
-        f1_max=0.0
-
-        print("start training")
-        self.starttime = datetime.datetime.now()
-
-        for epochnum in range(self.num_epochs):
-            batches = self.data.train_batch_iter(self.batch_size)  # batch迭代器
-
-            if epochnum>0:
-                train_op_chioce=self.train_op1
-
-            for x_batch,y_batch,batchnum,batchmax in batches:                                 #通过迭代器取出batch数据
-                self.sess.graph.finalize()
-                feed_dict = {self.input_x: x_batch, self.input_y: y_batch, self.dropout_keep_prob: self.dropout,self.is_train:True}
-                _, summaries, loss ,step= self.sess.run([train_op_chioce, self.train_summary_op, self.loss,self.global_step], feed_dict=feed_dict)
-                self.train_summary_writer.add_summary(summaries, step)  # 对记录文件添加上边run出的记录和step数
-
-                if ((step - 1) % self.num_checkpoints == 0):
-                    print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-                    print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, self.num_epochs, batchnum, batchmax))
-
-                if ((step - 1) and (step - 1) % self.num_test == 0):
-                    p,r,f1=self.testModel()
-                    if f1>f1_max:
-                        f1_max=f1
-                        self.saveModel()
-                        f = open("./" + self.Model_dir + '/info.txt', 'w')
-                        time = datetime.datetime.now()
-                        str = '第%d轮训练用时%ds\n' % (epochnum + 1, (time - self.starttime).seconds)
-                        str += 'p_5 : %f , r_5 : %f , f1 : %f\n' % (p, r, f1)
-                        f.write(str)
-                        f.close()
-                        print("saved")
-
-            print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            print('epoch %d finish' % (epochnum+1))
-
-    def trainModel2(self):
+    def trainModel(self):
         train_num = 0
         train_op_chioce = self.train_op_array[train_num]
         f1_max = 0.0
@@ -320,7 +270,7 @@ class Inception(object):
         self.starttime = datetime.datetime.now()
         self.write_log_infomation("start time : " + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), True)
 
-        max_epochs = self.num_epochs * 4
+        max_epochs = self.num_optimizer * 4
         for epochnum in range(max_epochs):
             batches = self.data.train_batch_iter(self.batch_size)  # batch迭代器
 
@@ -341,12 +291,12 @@ class Inception(object):
                     print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                     print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, max_epochs, batchnum, batchmax))
 
-                if (epochnum == max_epochs-1 and batchnum == batchmax // 2):
+                if batchnum % 15001==0 or (epochnum == max_epochs-1 and batchnum == batchmax // 2):
                     p, r, f1 = self.testModel()
-                    if f1 > f1_max:
-                        f1_max = f1
-                        self.saveModel()
-                        print("saved")
+                    # if f1 > f1_max:
+                    #     f1_max = f1
+                    #     self.saveModel()
+                    #     print("saved")
                     str = "\n第%d轮训练一半\n时间 : " % (epochnum + 1)
                     str += datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     str += '\np : %f , r : %f , f1 : %f\n' % (p, r, f1)
@@ -367,7 +317,7 @@ class Inception(object):
             str += '\np : %f , r : %f , f1 : %f\n' % (p, r, f1)
             self.write_log_infomation(str)
 
-            if train_num < self.num_epochs:
+            if train_num < self.num_optimizer:
                 train_op_chioce = self.train_op_array[train_num]
             else:
                 break
@@ -419,8 +369,8 @@ class Inception(object):
 def main():
     inception=Inception()
     inception.trainModel()
-    # cnn.loadModel()
-    # cnn.testModel()
+    # inception.loadModel()
+    # inception.testModel()
 
 if __name__ == '__main__':
     main()
