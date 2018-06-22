@@ -8,7 +8,7 @@ class dataset(object):
         if desktop==1:
             self.data_dir = "D:/wang/out/"
         elif desktop==2:
-            self.data_dir = "D:/bioasq2018/"
+            self.data_dir = "E:/D盘数据备份/out/"
         self.train_data_x_dir = self.data_dir + "train_data_x/data_"
         self.train_data_y_dir = self.data_dir + "train_data_y/data_"
 
@@ -18,7 +18,7 @@ class dataset(object):
         self.vx_size=200
         self.max_file_num=338
         self.train_file_num=[0,74]
-        self.test_file_num=[75,75]
+        self.test_file_num=[336,336]
 
         self.mode=mode
         self.name='bioasq'
@@ -60,7 +60,7 @@ class dataset(object):
                 min_num=k*batch_size
                 max_num=min((k+1)*batch_size,train_num)
                 for j in range(min_num,max_num):
-                    x = temp_data_x[i]
+                    x = temp_data_x[j]
                     y = self.process_Y(temp_data_y[j])
                     X.append(x)
                     Y.append(y)

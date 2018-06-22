@@ -21,10 +21,10 @@ class TextRNN(object):
         self.l2_reg_lambda = 0.0000     #l2范数的学习率
         self.num_checkpoints = 100  # 打印的频率
         self.dropout=1.0               #dropout比例
-        self.mode_learning_rate = 5e-3
+        self.mode_learning_rate = 1e-3
         self.embed_learning_rate = 2e-4
         self.batch_size=100
-        self.num_epochs = 10            #总的训练次数
+        self.num_optimizer = 10         #总的优化器次数，训练遍数是他的n倍
         self.Model_dir = "TextRNN"  # 模型参数默认保存位置
 
         self.hidden_size = self.embedding_size
@@ -74,13 +74,14 @@ class TextRNN(object):
         self.dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
 
         # Embedding layer
-        init_value=tf.truncated_normal_initializer(stddev=0.1)
-        if self.vocab_size!=0:
-            with tf.name_scope("embedding"):
-                W = tf.Variable(self.data.load_vocabulary(),name="embedding_w")
-                embedded_chars = tf.nn.embedding_lookup(W, self.input_x)                                        #通过input_x查找对应字典的随机数
-        else:
-            embedded_chars=self.input_x
+        with tf.name_scope('embedding'):
+            init_value=tf.truncated_normal_initializer(stddev=0.1)
+            if self.vocab_size!=0:
+                with tf.name_scope("embedding"):
+                    W = tf.Variable(self.data.load_vocabulary(),name="embedding_w")
+                    embedded_chars = tf.nn.embedding_lookup(W, self.input_x)                                        #通过input_x查找对应字典的随机数
+            else:
+                embedded_chars=self.input_x
 
         with tf.name_scope("RNN"):
             lstm_fw_cell = tf.contrib.rnn.BasicLSTMCell(self.hidden_size) # forward direction cell
@@ -98,18 +99,21 @@ class TextRNN(object):
         out=tf.reshape(temp[self.sequence_length-1],[-1,self.hidden_size*2])
         out=self.batch_norm(out,self.is_train,name='bn1')
 
-        out = self.liner(out, self.hidden_size * 2, 'line1')
+        with tf.name_scope('liner'):
+            out = self.liner(out, self.hidden_size * 2, 'line1')
 
-        out = self.liner(out, self.hidden_size * 2, 'line2')
+            out = self.liner(out, self.hidden_size * 2, 'line2')
+
+            w_projection = tf.get_variable("w_projection", shape=[self.hidden_size * 2, self.num_classes],
+                                           initializer=init_value)  # [embed_size,label_size]
+            b_projection = tf.get_variable("bias_projection", shape=[self.num_classes])  # [label_size]
+            logits = tf.matmul(out, w_projection) + b_projection  # [batch_size,num_classes]
 
         # output_rnn=tf.expand_dims(output_rnn,-1)
         # pooled = tf.nn.max_pool(output_rnn, ksize=[1, self.sequence_length, 1, 1], strides=[1, 1, 1, 1],padding='VALID', name="pool")
         # pooled=tf.reshape(shit3,[-1,self.hidden_size*2])
 
         with tf.name_scope("output"):  # inputs: A `Tensor` of shape `[batch_size, dim]`.  The forward activations of the input network.
-            w_projection = tf.get_variable("w_projection", shape=[self.hidden_size * 2, self.num_classes],initializer=init_value)  # [embed_size,label_size]
-            b_projection = tf.get_variable("bias_projection", shape=[self.num_classes])  # [label_size]
-            logits = tf.matmul(out, w_projection) + b_projection  # [batch_size,num_classes]
             self.out = tf.nn.sigmoid(logits)
 
         # Calculate mean cross-entropy loss
@@ -126,7 +130,7 @@ class TextRNN(object):
         var_expect_embedding = [v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
         train_adamop_array = []
         learning_rate_temp = self.mode_learning_rate
-        for i in range(self.num_epochs):
+        for i in range(self.num_optimizer):
             train_adamop_array.append(tf.train.AdamOptimizer(
                 learning_rate_temp))  # .minimize(self.loss,global_step=self.global_step,var_list=var_expect_embedding))
             learning_rate_temp /= 2.0
@@ -138,7 +142,7 @@ class TextRNN(object):
         grads2 = grads[len(var_expect_embedding):]
 
         self.train_op_array = []
-        for i in range(self.num_epochs):
+        for i in range(self.num_optimizer):
             self.train_op_array.append(
                 train_adamop_array[i].apply_gradients(zip(grads1, var_expect_embedding), global_step=self.global_step))
         if self.vocab_size != 0:
@@ -185,10 +189,7 @@ class TextRNN(object):
         dev_summary_dir = os.path.join(out_dir, "dev")
         self.dev_summary_writer = tf.summary.FileWriter(dev_summary_dir, self.sess.graph)
 
-    def trainModel(self,num_epoch=10):
-        self.trainModel2()
-
-    def trainModel2(self):
+    def trainModel(self):
         train_num = 0
         train_op_chioce = self.train_op_array[train_num]
         f1_max = 0.0
@@ -197,7 +198,8 @@ class TextRNN(object):
         self.starttime = datetime.datetime.now()
         self.write_log_infomation("start time : " + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), True)
 
-        for epochnum in range(self.num_epochs):
+        sum_num = self.num_optimizer * 3
+        for epochnum in range(sum_num):
             batches = self.data.train_batch_iter(self.batch_size)  # batch迭代器
 
             for x_batch, y_batch, batchnum, batchmax in batches:  # 通过迭代器取出batch数据
@@ -214,14 +216,14 @@ class TextRNN(object):
 
                 if (batchnum % self.num_checkpoints == 0):
                     print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-                    print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, self.num_epochs, batchnum, batchmax))
+                    print('epoch:%d/%d\tbatch:%d/%d' % (epochnum, sum_num, batchnum, batchmax))
 
-                if batchnum % 15001==0 or (epochnum == self.num_epochs-1 and batchnum == batchmax // 2):
+                if batchnum % 15001==0 or (epochnum == sum_num-1 and batchnum == batchmax // 2):
                     p, r, f1 = self.testModel()
-                    if f1 > f1_max:
-                        f1_max = f1
-                        self.saveModel()
-                        print("saved")
+                    # if f1 > f1_max:
+                    #     f1_max = f1
+                    #     self.saveModel()
+                    #     print("saved")
                     str = "\n第%d轮训练一半\n时间 : " % (epochnum + 1)
                     str += datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     str += '\np : %f , r : %f , f1 : %f\n' % (p, r, f1)
@@ -243,7 +245,7 @@ class TextRNN(object):
             self.write_log_infomation(str)
             # train_num += 1
 
-            if train_num < self.num_epochs:
+            if train_num < self.num_optimizer:
                 train_op_chioce = self.train_op_array[train_num]
             else:
                 break
@@ -295,6 +297,8 @@ class TextRNN(object):
 def main():
     rnn=TextRNN()
     rnn.trainModel()
+    # rnn.loadModel()
+    # rnn.testModel()
 
 if __name__ == '__main__':
     main()
