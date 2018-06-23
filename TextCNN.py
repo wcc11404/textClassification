@@ -239,7 +239,7 @@ class TextCNN(object):
                     print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                     print('epoch:%d/%d\tbatch:%d/%d\tloss:%f' % (epochnum, max_epochs, batchnum, batchmax, loss))
 
-                if batchnum % 15001 == 0 or (epochnum == max_epochs-1 and batchnum == batchmax // 2):
+                if batchnum % 1001 == 0 or (epochnum == max_epochs-1 and batchnum == batchmax // 2):
                     p, r, f1 = self.testModel()
                     # if f1 > f1_max:
                     #     f1_max = f1

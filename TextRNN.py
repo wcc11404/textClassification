@@ -18,7 +18,7 @@ class TextRNN(object):
         # self.decay_rate = 0.5  # 62
         #self.learning_rate = tf.Variable(1e-2, trainable=False, name="learning_rate")  # ADD learning_rate
 
-        self.l2_reg_lambda = 0.0000     #l2范数的学习率
+        self.l2_reg_lambda = 0.0001     #l2范数的学习率
         self.num_checkpoints = 100  # 打印的频率
         self.dropout=1.0               #dropout比例
         self.mode_learning_rate = 1e-3

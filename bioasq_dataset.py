@@ -11,6 +11,8 @@ class dataset(object):
             self.data_dir = "E:/D盘数据备份/out/"
         self.train_data_x_dir = self.data_dir + "train_data_x/data_"
         self.train_data_y_dir = self.data_dir + "train_data_y/data_"
+        self.test_data_x_dir = self.data_dir + "test_data_x/data_0"
+        self.test_data_y_dir = self.data_dir + "test_data_y/data_0"
 
         self.max_sentence_size=325
         self.vy_num=28340
@@ -67,29 +69,29 @@ class dataset(object):
                 yield X,Y,k+(i-self.train_file_num[0])*tempnum+1,tempnum*(self.train_file_num[1]-self.train_file_num[0]+1)
 
     def dev_batch_iter(self,batch_size=50):
-        for i in range(self.test_file_num[0],self.test_file_num[1]+1):
-            with open(self.train_data_x_dir + '%d' % i, 'rb') as f:
-                temp_data_x=pickle.load(f)
-            with open(self.train_data_y_dir + '%d' % i, 'rb') as f:
-                self.temp_data_y=pickle.load(f)
+        # for i in range(self.test_file_num[0],self.test_file_num[1]+1):
+        with open(self.test_data_x_dir , 'rb') as f:
+            temp_data_x=pickle.load(f)
+        with open(self.test_data_y_dir, 'rb') as f:
+            self.temp_data_y=pickle.load(f)
 
-            self.index=0    #bioasq数据集测试专用
+        self.index=0    #bioasq数据集测试专用
 
-            train_num=len(temp_data_x)
-            tempnum=(train_num-1)//batch_size+1
-            for k in range(tempnum):
-                X = []
-                Y = []
-                min_num=k*batch_size
-                max_num=min((k+1)*batch_size,train_num)
-                for j in range(min_num,max_num):
-                    x = temp_data_x[j]
-                    y = self.process_Y(self.temp_data_y[j])
-                    X.append(x)
-                    Y.append(y)
-                yield X,Y
+        train_num=len(temp_data_x)
+        tempnum=(train_num-1)//batch_size+1
+        for k in range(tempnum):
+            X = []
+            Y = []
+            min_num=k*batch_size
+            max_num=min((k+1)*batch_size,train_num)
+            for j in range(min_num,max_num):
+                x = temp_data_x[j]
+                y = self.process_Y(self.temp_data_y[j])
+                X.append(x)
+                Y.append(y)
+            yield X,Y
 
-            del self.temp_data_y
+        del self.temp_data_y
 
     def init_evalution(self):
         self.fenzi = 0.0

@@ -167,10 +167,10 @@ class Inception(object):
             conv = self.reduction(conv, 'reduction1')
             conv = self.reduction(conv, 'reduction2')
             conv = self.reduction(conv, 'reduction3')
-            out=self.inceptionB(conv)
+            out = self.inceptionB(conv,output_proportion=[1,1,1,1])
 
         with tf.name_scope('pooling'):
-            out=tf.nn.max_pool(out,ksize=[1, int(out.shape[1]), 1, 1],strides=[1, 1, 1, 1],padding='VALID',name="pool")
+            out=tf.nn.max_pool(out,ksize=[1, int(out.shape[1]), 10, 1],strides=[1, 1, 1, 1],padding='VALID',name="pool")
             temp=int(out.shape[1])*int(out.shape[2])*int(out.shape[3])
             out=tf.reshape(out,[-1,temp])
 
@@ -178,13 +178,9 @@ class Inception(object):
         #     out = tf.nn.dropout(out, self.dropout_keep_prob)
 
         with tf.name_scope("liner"):
-            line = self.liner(out, temp // 2, 'line1')
-
-            line = self.liner(line, temp // 2, 'line2')
-
-            w2 = tf.Variable(tf.truncated_normal([temp // 2, self.num_classes], stddev=0.1), name='weight_line_2')
+            w2 = tf.Variable(tf.truncated_normal([temp, self.num_classes], stddev=0.1), name='weight_line_2')
             b2 = tf.Variable(tf.constant(0.1, shape=[self.num_classes]), name='bias_liner_2')
-            liner_out = tf.matmul(line, w2) + b2
+            liner_out = tf.matmul(out, w2) + b2
 
         # Final (unnormalized) scores and predictions
         with tf.name_scope("output"):
@@ -291,7 +287,7 @@ class Inception(object):
                     print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                     print('epoch:%d/%d\tbatch:%d/%d\tloss:%f' % (epochnum, max_epochs, batchnum, batchmax, loss))
 
-                if batchnum % 15001==0 or (epochnum == max_epochs-1 and batchnum == batchmax // 2):
+                if batchnum % 1001==0 or (epochnum == max_epochs-1 and batchnum == batchmax // 2):
                     p, r, f1 = self.testModel()
                     # if f1 > f1_max:
                     #     f1_max = f1

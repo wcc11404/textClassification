@@ -14,7 +14,8 @@ max_abstract_length=300
 max_title_length=25
 embedding_num=1701041
 embedding_size=200
-max_train_data=13486072
+max_data=13486072
+test_data_interval=400
 label_num=28340
 max_abstract_perfile=40000
 desktop=2
@@ -141,7 +142,7 @@ def all_abstract_word():
         f1.write(str)
 
         if num%5000==0:
-            print('finished %f%%' % (num/max_train_data*100))
+            print('finished %f%%' % (num / max_data * 100))
 
     f.close()
     f1.close()
@@ -209,6 +210,12 @@ def process_abstract_main():
         shutil.rmtree(f_out_name + 'train_data_x')
         os.makedirs(f_out_name + 'train_data_x')
 
+    if not os.path.exists(f_out_name + 'test_data_x'):
+        os.makedirs(f_out_name + 'test_data_x')
+    else:
+        shutil.rmtree(f_out_name + 'test_data_x')
+        os.makedirs(f_out_name + 'test_data_x')
+
     #建立embed快速缓存
     cache_embed={}
     random_embed = list(float(w) for w in map['random_embed'].split(' '))
@@ -229,26 +236,36 @@ def process_abstract_main():
     del count
 
     iter=getLineIter2()
-    abstract_array = []
+    train_array = []
+    test_array = []
     File_num = 0
     for line_abstract, line_title, num in iter:
         line_abstract = line_abstract[:-1].strip().split(' ')   #-1是为了去除最后一个\n字符
         line_title = line_title[:-1].strip().split(' ')
         title_abstract = process_title_abstract(line_abstract, line_title, map, cache_embed)
-        abstract_array.append(title_abstract)
 
-        if num % max_abstract_perfile == 0:
+        if num % test_data_interval == 0:
+            test_array.append(title_abstract)
+        else:
+            train_array.append(title_abstract)
+
+        if len(train_array) == max_abstract_perfile:
             with open(f_out_name + 'train_data_x/data_%d' % File_num, 'wb') as data_f:
-                pickle.dump(abstract_array,data_f)
-            print("saved file %d/%d" % (File_num,max_train_data//max_abstract_perfile+1))
+                pickle.dump(train_array,data_f)
+            print("saved file %d/%d" % (File_num + 1,
+                        (max_data - max_data // test_data_interval) // max_abstract_perfile + 1))  # 测试数据被刨除出去
             File_num += 1
-            del abstract_array
-            abstract_array = []
+            del train_array
+            train_array = []
 
-    if len(abstract_array)!=0:
+    if len(train_array)!=0:
         with open(f_out_name + 'train_data_x/data_%d' % File_num, 'wb') as data_f:
-            pickle.dump(abstract_array, data_f)
-        print("saved file %d/%d" % (File_num, max_train_data // max_abstract_perfile + 1))
+            pickle.dump(train_array, data_f)
+        print("saved file %d/%d" % (File_num + 1,
+                        (max_data - max_data // test_data_interval) // max_abstract_perfile + 1))  # 测试数据被刨除出去
+
+    with open(f_out_name + 'test_data_x/data_0', 'wb') as data_f:
+        pickle.dump(test_array, data_f)
 
 def one_hot(x):
     # result=[0 for _ in range(label_num)]
@@ -276,16 +293,24 @@ def one_hot(x):
 def process_meshMajor():
     with open(f_in_name + 'model/label_map.pik', 'rb') as data_f:
         label_map=pickle.load(data_f)
+
     if not os.path.exists(f_out_name + 'train_data_y'):
         os.makedirs(f_out_name + 'train_data_y')
     else:
         shutil.rmtree(f_out_name + 'train_data_y')
         os.makedirs(f_out_name + 'train_data_y')
-    print(len(label_map))#28340
+
+    if not os.path.exists(f_out_name + 'test_data_y'):
+        os.makedirs(f_out_name + 'test_data_y')
+    else:
+        shutil.rmtree(f_out_name + 'test_data_y')
+        os.makedirs(f_out_name + 'test_data_y')
+    # print(len(label_map))#28340
 
     iter = getLineIter()
     File_num = 0
-    label_array=[]
+    train_array=[]
+    test_array=[]
     for line,num in iter:
         meshMajor = line['meshMajor']
         temparray=[]
@@ -295,20 +320,29 @@ def process_meshMajor():
             except:
                 print('loss '+ label)
         temparray=one_hot(temparray)
-        label_array.append(temparray)
 
-        if num % max_abstract_perfile==0:
+        if num % test_data_interval == 0:
+            test_array.append(temparray)
+        else:
+            train_array.append(temparray)
+
+        if len(train_array) == max_abstract_perfile:
             with open(f_out_name + 'train_data_y/data_%d' % File_num, 'wb') as data_f:
-                pickle.dump(label_array,data_f)
-            print("saved file %d/%d" % (File_num, max_train_data // max_abstract_perfile + 1))
+                pickle.dump(train_array,data_f)
+            print("saved file %d/%d" % (File_num + 1,
+                        (max_data - max_data // test_data_interval) // max_abstract_perfile + 1))  # 测试数据被刨除出去
             File_num += 1
-            del label_array
-            label_array=[]
+            del train_array
+            train_array=[]
 
-    if len(label_array)!=0:
+    if len(train_array)!=0:
         with open(f_out_name + 'train_data_y/data_%d' % File_num, 'wb') as data_f:
-            pickle.dump(label_array, data_f)
-        print("saved file %d/%d" % (File_num, max_train_data // max_abstract_perfile + 1))
+            pickle.dump(train_array, data_f)
+        print("saved file %d/%d" % (File_num + 1,
+                        (max_data - max_data // test_data_interval) // max_abstract_perfile + 1))  # 测试数据被刨除出去
+
+    with open(f_out_name + 'test_data_y/data_0', 'wb') as data_f:
+        pickle.dump(test_array, data_f)
 
 def process_meshMajor_main():
     count=Counter()
@@ -321,7 +355,7 @@ def process_meshMajor_main():
         count.update(meshMajor)
 
         if num%500000==0:
-            print('finished %f%%'% (num/max_train_data*100))
+            print('finished %f%%' % (num / max_data * 100))
 
     # print(count.most_common())
     label_map = {}
@@ -393,15 +427,15 @@ def hist_MeshMajor():
 
 def main():
     # process_meshMajor_main() #预统计label信息，存储label编码模型
-    # process_meshMajor()      #替换所有label为其编码，并分批存储成pickle
+    process_meshMajor()      #替换所有label为其编码，并分批存储成pickle
 
     # readEmbedding()          #预统计embedding信息，存储embedding模型，map['word']='str'形式
     # all_abstract_word()        #预统计所有title和abstract的单词信息，分词，去除停用词，标点符号，存储到文件，并用counter统计，存储处理后的word
-    # process_abstract_main()  #处理上一步处理后的word，将所有word转换成embedding（float形式），分批存储成pickle
+    process_abstract_main()  #处理上一步处理后的word，将所有word转换成embedding（float形式），分批存储成pickle
 
     # load_xydata0()           #测试读取xy数据后内存占用大小
     # hist_title_abstract()       #观察title和abstract长度直方图
-    hist_MeshMajor()            #观察标签数量直方图
+    # hist_MeshMajor()            #观察标签数量直方图
 
 if __name__ == '__main__':
     main()
