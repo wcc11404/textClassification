@@ -259,6 +259,7 @@ class Inception(object):
 
     def trainModel(self):
         train_num = 0
+        same_num=0
         train_op_chioce = self.train_op_array[train_num]
         f1_max = 0.0
 
@@ -287,7 +288,7 @@ class Inception(object):
                     print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                     print('epoch:%d/%d\tbatch:%d/%d\tloss:%f' % (epochnum, max_epochs, batchnum, batchmax, loss))
 
-                if batchnum % 1001==0 or (epochnum == max_epochs-1 and batchnum == batchmax // 2):
+                if batchnum % 15001==0 or (epochnum == max_epochs-1 and batchnum == batchmax // 2):
                     p, r, f1 = self.testModel()
                     # if f1 > f1_max:
                     #     f1_max = f1
@@ -304,8 +305,14 @@ class Inception(object):
                 f1_max = f1
                 self.saveModel()
                 print("saved")
+                same_num += 1
             else:
                 self.loadModel()
+                train_num += 1
+                same_num = 0
+
+            #同样的优化器最多用5次
+            if same_num == 5:
                 train_num += 1
 
             str = "\n第%d轮训练结束\n时间 : " % (epochnum + 1)
