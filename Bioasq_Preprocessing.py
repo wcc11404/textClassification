@@ -455,11 +455,18 @@ def tongji_label():
                 label_matrix[num1][num2] += 1
                 label_matrix[num2][num1] += 1
 
-    for i in range(label_num):
-        if label_array[i]>0:
-            for j in range(label_num):
-                if label_matrix[i][j]/label_array[i]>=0.5:
-                    print("%d\t%d\t%f" % (i,j,label_matrix[i][j]/label_array[i]))
+    with open(f_in_name + 'model/tongji_matrix.pik', 'wb') as data_f:
+        pickle.dump(label_matrix, data_f)
+    with open(f_in_name + 'model/tongji_array.pik', 'wb') as data_f:
+        pickle.dump(label_array, data_f)
+
+    for i in range(5):
+        print(label_array[i]/max_data)
+    # for i in range(label_num):
+    #     if label_array[i]>0:
+    #         for j in range(label_num):
+    #             if label_matrix[i][j]/label_array[i]>=0.5:
+    #                 print("%d\t%d\t%f" % (i,j,label_matrix[i][j]/label_array[i]))
 
 def main():
     # process_meshMajor_main() #预统计label信息，存储label编码模型
