@@ -425,17 +425,54 @@ def hist_MeshMajor():
     plt.hist(arr,bins=500)
     plt.show()
 
+def tongji_label():
+    label_matrix=[[0 for _ in range(label_num)] for _ in range(label_num)]
+    label_array=[0 for _ in range(label_num)]
+
+    for i in range(337):
+        print(i)
+        with open(f_out_name + 'train_data_y/data_%d' % i, 'rb') as data_f:
+            temp=pickle.load(data_f)
+
+        for j in range(len(temp)):
+            for a in range(len(temp[j])):
+                num1=temp[j][a]
+                label_array[num1] += 1
+                for b in range(a+1,len(temp[j])):
+                    num2=temp[j][b]
+                    label_matrix[num1][num2] += 1
+                    label_matrix[num2][num1] += 1
+
+    with open(f_out_name + 'test_data_y/data_0', 'rb') as data_f:
+        temp = pickle.load(data_f)
+
+    for j in range(len(temp)):
+        for a in range(len(temp[j])):
+            num1 = temp[j][a]
+            label_array[num1] += 1
+            for b in range(a + 1, len(temp[j])):
+                num2 = temp[j][b]
+                label_matrix[num1][num2] += 1
+                label_matrix[num2][num1] += 1
+
+    for i in range(label_num):
+        if label_array[i]>0:
+            for j in range(label_num):
+                if label_matrix[i][j]/label_array[i]>=0.5:
+                    print("%d\t%d\t%f" % (i,j,label_matrix[i][j]/label_array[i]))
+
 def main():
     # process_meshMajor_main() #预统计label信息，存储label编码模型
-    process_meshMajor()      #替换所有label为其编码，并分批存储成pickle
+    # process_meshMajor()      #替换所有label为其编码，并分批存储成pickle
 
     # readEmbedding()          #预统计embedding信息，存储embedding模型，map['word']='str'形式
     # all_abstract_word()        #预统计所有title和abstract的单词信息，分词，去除停用词，标点符号，存储到文件，并用counter统计，存储处理后的word
-    process_abstract_main()  #处理上一步处理后的word，将所有word转换成embedding（float形式），分批存储成pickle
+    # process_abstract_main()  #处理上一步处理后的word，将所有word转换成embedding（float形式），分批存储成pickle
 
     # load_xydata0()           #测试读取xy数据后内存占用大小
     # hist_title_abstract()       #观察title和abstract长度直方图
     # hist_MeshMajor()            #观察标签数量直方图
+    tongji_label()              #统计标签共现次数
 
 if __name__ == '__main__':
     main()
