@@ -377,3 +377,103 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+    def buildModel(self):
+        if self.vocab_size!=0:
+            self.input_x = tf.placeholder(tf.int32, [None, self.sequence_length], name="input_x")
+        else :
+            self.input_x = tf.placeholder(tf.float32, [None, self.sequence_length,self.embedding_size], name="input_x")
+        self.input_y = tf.placeholder(tf.float32, [None, self.num_classes], name="input_y")
+        self.dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
+
+        # Embedding layer
+        init_value=tf.random_normal_initializer(stddev=0.1)
+        if self.vocab_size!=0:
+            with tf.name_scope("embedding"):
+                W = tf.Variable(self.data.load_vocabulary(),name="embedding_w")
+                embedded_chars = tf.nn.embedding_lookup(W, self.input_x)                                        #通过input_x查找对应字典的随机数
+        else:
+            embedded_chars=self.input_x
+
+        # cell = [rnn.LSTMCell(self.hidden_size) for i in range(2)]
+        # mutli_layer = rnn.MultiRNNCell(cell)
+        # attention_mechanism = LuongAttention(num_units=self.hidden_size,memory=embedded_chars)
+        # att_wrapper = AttentionWrapper(cell=mutli_layer,attention_mechanism=attention_mechanism,
+        #                                attention_layer_size=self.hidden_size,
+        #                                cell_input_fn=lambda input, attention: input)
+        # states = att_wrapper.zero_state(self.batch_size, tf.float32)
+        # print(states)
+
+        lstm_fw_cell = tf.contrib.rnn.BasicLSTMCell(self.hidden_size)  # forward direction cell
+        lstm_bw_cell = tf.contrib.rnn.BasicLSTMCell(self.hidden_size)  # backward direction cell
+        # mlstm_fw_cell = rnn.MultiRNNCell([lstm_fw_cell] * 1, state_is_tuple=True)
+        # mlstm_bw_cell = rnn.MultiRNNCell([lstm_bw_cell] * 1, state_is_tuple=True)
+
+        outputs, _ = tf.nn.bidirectional_dynamic_rnn(lstm_fw_cell, lstm_bw_cell, embedded_chars, dtype=tf.float32,
+                                                     scope="LSTM_1")  # [batch_size,sequence_length,hidden_size] #creates a dynamic bidirectional recurrent neural network
+        output_rnn = tf.concat(outputs, axis=2)  # [batch_size,sequence_length,hidden_size*2]
+        out=self.attention(output_rnn,self.hidden_size*2)
+        num_filters_total=int(out.shape[1])
+        # Add dropout
+        # with tf.name_scope("dropout"):
+        #     h_drop = tf.nn.dropout(h_pool_flat, self.dropout_keep_prob)
+        with tf.name_scope("liner"):
+            w2 = tf.Variable(tf.truncated_normal([num_filters_total, self.num_classes], stddev=0.1),
+                             name='weight_line_2')
+            b2 = tf.Variable(tf.constant(0.1, shape=[self.num_classes]), name='bias_liner_2')
+            liner_out2 = tf.matmul(out, w2) + b2
+
+        # Final (unnormalized) scores and predictions
+        with tf.name_scope("output"):
+            self.out = tf.nn.sigmoid(liner_out2)
+
+        # Calculate mean cross-entropy loss
+        with tf.name_scope("loss"):
+            l2_loss =tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name])
+            losses = tf.nn.sigmoid_cross_entropy_with_logits(logits=liner_out2, labels=self.input_y)
+            losses = tf.reduce_sum(losses,axis=1)
+            losses = tf.reduce_mean(losses)
+            self.loss=losses + self.l2_reg_lambda * l2_loss
+
+        # Define Training procedure
+        self.global_step = tf.Variable(0, name="global_step", trainable=False)
+        ##########################################  简版训练op  #################################################
+        # if self.mode==1:
+        #     learning_rate = tf.train.exponential_decay(self.learning_rate, self.global_step, self.decay_steps,
+        #                                                self.decay_rate, staircase=True)
+        #     optimizer = tf.train.AdamOptimizer(learning_rate)
+        #
+        #     var_expect_embedding=[v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
+        #     grads_and_vars = optimizer.compute_gradients(self.loss,var_list=var_expect_embedding)
+        #     self.train_op = optimizer.apply_gradients(grads_and_vars, global_step=self.global_step)
+        #
+        #     # optimizer1 = tf.train.AdamOptimizer(learning_rate)
+        #     grads_and_vars1=optimizer.compute_gradients(self.loss)
+        #     self.train_op1 = optimizer.apply_gradients(grads_and_vars1, global_step=self.global_step)
+        # ##########################################################################################################
+        # elif self.mode==2:
+        var_expect_embedding = [v for v in tf.trainable_variables() if 'embedding_w' not in v.name]
+        train_adamop_array=[]
+        learning_rate_temp = self.mode_learning_rate
+        for i in range(self.num_epochs):
+            train_adamop_array.append(tf.train.AdamOptimizer(learning_rate_temp))#.minimize(self.loss,global_step=self.global_step,var_list=var_expect_embedding))
+            learning_rate_temp/=2.0
+        var_embedding=[v for v in tf.trainable_variables() if 'embedding_w' in v.name]
+        train_embedding_adamop=tf.train.AdamOptimizer(self.embed_learning_rate)#.minimize(self.loss,var_list=var_embedding)
+
+        grads=tf.gradients(self.loss,var_expect_embedding+var_embedding)
+        grads1=grads[:len(var_expect_embedding)]
+        grads2=grads[len(var_expect_embedding):]
+
+        self.train_op_array=[]
+        for i in range(self.num_epochs):
+            self.train_op_array.append(train_adamop_array[i].apply_gradients(zip(grads1,var_expect_embedding),global_step=self.global_step))
+        if self.vocab_size!=0:
+            self.train_embedding_op=train_embedding_adamop.apply_gradients(zip(grads2,var_embedding))
+
+        self.buildSummaries()
+
+        # 初始化变量
+        self.sess.run(tf.global_variables_initializer())
+
+        self.Saver = tf.train.Saver()
