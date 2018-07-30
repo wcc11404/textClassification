@@ -430,7 +430,7 @@ def tongji_label():
     label_array=[0 for _ in range(label_num)]
 
     for i in range(337):
-        print(i)
+        # print(i)
         with open(f_out_name + 'train_data_y/data_%d' % i, 'rb') as data_f:
             temp=pickle.load(data_f)
 
@@ -462,11 +462,60 @@ def tongji_label():
 
     for i in range(5):
         print(label_array[i]/max_data)
-    # for i in range(label_num):
-    #     if label_array[i]>0:
-    #         for j in range(label_num):
-    #             if label_matrix[i][j]/label_array[i]>=0.5:
-    #                 print("%d\t%d\t%f" % (i,j,label_matrix[i][j]/label_array[i]))
+
+def show_label_information():
+    with open(f_in_name + 'model/tongji_matrix.pik', 'rb') as data_f:
+        label_matrix=pickle.load(data_f)
+    with open(f_in_name + 'model/tongji_array.pik', 'rb') as data_f:
+        label_array=pickle.load(data_f)
+
+    array=[]
+    array2=[]
+    array3=[]
+    for i in range(label_num):
+        if label_array[i]>0:
+            for j in range(label_num):
+                if label_matrix[i][j]/label_array[i]>=0.3:
+                    array.append(label_matrix[i][j]/label_array[i])
+                    if label_matrix[i][j]/label_array[i]>=0.5:
+                        array2.append(label_matrix[i][j]/label_array[i])
+                        if label_matrix[i][j] / label_array[i] >= 0.8:
+                            array3.append(label_matrix[i][j] / label_array[i])
+
+    del label_matrix
+    del label_array
+
+    print(len(array))
+    print(len(array2))
+    print(len(array3))
+    # array.sort()
+    # array=array[::-1]
+    # print(array[0])
+    # plt.hist(array,100)
+    # plt.show()
+
+def show_label_information2():
+    with open(f_in_name + 'model/tongji_matrix.pik', 'rb') as data_f:
+        label_matrix=pickle.load(data_f)
+    with open(f_in_name + 'model/tongji_array.pik', 'rb') as data_f:
+        label_array=pickle.load(data_f)
+
+    array=[]
+    for i in range(label_num):
+        if label_array[i]>0:
+            for j in range(label_num):
+                if label_matrix[i][j]/label_array[i]==1.0:
+                    array.append([i,j,label_array[i],label_array[j]])
+
+    del label_matrix
+    del label_array
+
+    with open(f_in_name + 'model/label_array.pik', 'rb') as data_f:
+        l_array=pickle.load(data_f)
+
+    print(len(array))
+    for i in range(100):
+        print(array[i],l_array[array[i][0]],l_array[array[i][1]])
 
 def main():
     # process_meshMajor_main() #预统计label信息，存储label编码模型
@@ -479,7 +528,8 @@ def main():
     # load_xydata0()           #测试读取xy数据后内存占用大小
     # hist_title_abstract()       #观察title和abstract长度直方图
     # hist_MeshMajor()            #观察标签数量直方图
-    tongji_label()              #统计标签共现次数
-
+    # tongji_label()              #统计标签共现次数
+    show_label_information()
+    # show_label_information2()
 if __name__ == '__main__':
     main()
